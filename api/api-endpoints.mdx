@@ -1,0 +1,599 @@
+---
+title: API Endpoints
+description: Complete reference of backend API endpoints used in the Biométrico application
+---
+
+## Overview
+
+This document lists all API endpoints discovered in the Biométrico application source code. All endpoints are prefixed with the base URL configured in `__API_BIOMETRICO__`.
+
+## Authentication Endpoints
+
+### Login
+
+Authenticates a user and returns a JWT token.
+
+```http
+POST /biometrico/login
+```
+
+<ParamField body="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User's password
+</ParamField>
+
+<ResponseField name="token" type="string">
+  JWT authentication token
+</ResponseField>
+
+<ResponseField name="token_type" type="string">
+  Token type (typically "Bearer")
+</ResponseField>
+
+<ResponseField name="Role" type="string">
+  User role (sotics, atics, or sa)
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  User's full name
+</ResponseField>
+
+**Source**: `src/assets/js/function/login_function.js`
+
+## Docentes (Teachers) Endpoints
+
+### Get Teachers List
+
+Retrieves a paginated list of teachers.
+
+```http
+GET /biometrico/getdocentes
+```
+
+<ParamField query="page" type="number">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="perPage" type="number">
+  Number of records per page
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search query for filtering teachers
+</ParamField>
+
+**Source**: `src/components/fotos/docentes_foto.vue:594`
+
+### Get Individual Teacher
+
+Retrieves detailed information for a specific teacher by CI (Cédula).
+
+```http
+GET /biometrico/getindivDoc/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Teacher's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivDoc.vue:264`
+
+### Get Teacher Person Data
+
+Retrieves person data from the biometric system for a teacher.
+
+```http
+GET /biometrico/getperson/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Teacher's CI (identification number)
+</ParamField>
+
+<ParamField query="v" type="number">
+  Cache-busting parameter (timestamp)
+</ParamField>
+
+**Source**: `src/components/fotos/docentes_foto.vue:468`
+
+### Compare HikCentral Data
+
+Compares local data with HikCentral biometric system data for a teacher.
+
+```http
+GET /biometrico/compare-hikdoc/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Teacher's CI (identification number)
+</ParamField>
+
+<ParamField query="v" type="number">
+  Cache-busting parameter (timestamp)
+</ParamField>
+
+**Source**: `src/components/fotos/docentes_foto.vue:527`
+
+### Sync Teacher to HikCentral
+
+Synchronizes a teacher's data to the HikCentral biometric system.
+
+```http
+POST /biometrico/sync-hikcentral/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Teacher's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/fotos/docentes_foto.vue:504`
+
+### Update Teacher in HikCentral
+
+Updates an existing teacher's data in the HikCentral system.
+
+```http
+POST /biometrico/sync-hikdupdatedoce/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Teacher's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivDoc.vue:374`
+
+### Get Pending Sync Teachers
+
+Retrieves list of teachers pending synchronization with HikCentral.
+
+```http
+GET /biometrico/get-pending-sync
+```
+
+<ParamField query="page" type="number">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="perPage" type="number">
+  Number of records per page
+</ParamField>
+
+**Source**: `src/components/fotos/docentes_foto.vue:424`
+
+### Clear Cache
+
+Clears cached data for a specific teacher.
+
+```http
+GET /biometrico/clear-cache/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Teacher's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/fotos/docentes_foto.vue:559`
+
+### Download Teachers Photos (Bulk)
+
+Downloads a ZIP file containing photos of multiple teachers.
+
+```http
+GET /biometrico/descargarfotosmasivadoc
+```
+
+<ParamField query="carreras" type="array">
+  List of career/department IDs to filter teachers
+</ParamField>
+
+<ParamField query="periodo" type="string">
+  Academic period
+</ParamField>
+
+**Response**: ZIP file (binary data)
+
+**Source**: `src/components/fotos/docentes_foto.vue:660`
+
+## Estudiantes (Students) Endpoints
+
+### Get Students List
+
+Retrieves a paginated list of regular students.
+
+```http
+GET /biometrico/estudiantesfoto
+```
+
+<ParamField query="page" type="number">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="perPage" type="number">
+  Number of records per page
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search query for filtering students
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:550`
+
+### Get Individual Student
+
+Retrieves detailed information for a specific student.
+
+```http
+GET /biometrico/getindivEst/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Student's CI (identification number)
+</ParamField>
+
+<ParamField query="periodo" type="string">
+  Academic period filter
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivEst.vue:291`
+
+### Get Student Person Data
+
+Retrieves person data from the biometric system for a student.
+
+```http
+GET /biometrico/getperson-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Student's CI (identification number)
+</ParamField>
+
+<ParamField query="v" type="number">
+  Cache-busting parameter (timestamp)
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:437`
+
+### Compare HikCentral Data (Student)
+
+Compares local data with HikCentral biometric system data for a student.
+
+```http
+GET /biometrico/compare-hikdoc-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Student's CI (identification number)
+</ParamField>
+
+<ParamField query="v" type="number">
+  Cache-busting parameter (timestamp)
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:497`
+
+### Sync Student to HikCentral
+
+Synchronizes a student's data to the HikCentral biometric system.
+
+```http
+POST /biometrico/sync-hikdoc/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Student's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:473`
+
+### Sync Student with ID
+
+Synchronizes a student's data including their ID.
+
+```http
+POST /biometrico/sync-hikdoc-est-id/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Student's CI (identification number)
+</ParamField>
+
+<ParamField query="periodo" type="string">
+  Academic period
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivEst.vue:353`
+
+### Update Student in HikCentral
+
+Updates an existing student's data in the HikCentral system.
+
+```http
+POST /biometrico/sync-hikdoc-update/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Student's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivEst.vue:404`
+
+### Get Pending Sync Students
+
+Retrieves list of students pending synchronization with HikCentral.
+
+```http
+GET /biometrico/get-pending-sync-est
+```
+
+<ParamField query="page" type="number">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="perPage" type="number">
+  Number of records per page
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:389`
+
+### Get Academic Periods
+
+Retrieves available academic periods for student registration.
+
+```http
+GET /biometrico/get-periodos-rec
+```
+
+**Source**: `src/components/Registro/RegistroIndivEst.vue:265`
+
+## Pre-Estudiantes (Pre-Students) Endpoints
+
+### Get Pre-Students List
+
+Retrieves a paginated list of pre-students (applicants/pre-enrolled).
+
+```http
+GET /biometrico/estudiantesfoto-pre-est
+```
+
+<ParamField query="page" type="number">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="perPage" type="number">
+  Number of records per page
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search query for filtering pre-students
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_pre_foto.vue:550`
+
+### Get Individual Pre-Student
+
+Retrieves detailed information for a specific pre-student.
+
+```http
+GET /biometrico/getindivEst-pre-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Pre-student's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivPreEst.vue:263`
+
+### Get Pre-Student Person Data
+
+Retrieves person data from the biometric system for a pre-student.
+
+```http
+GET /biometrico/getperson-pre-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Pre-student's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_pre_foto.vue:437`
+
+### Compare HikCentral Data (Pre-Student)
+
+Compares local data with HikCentral biometric system data for a pre-student.
+
+```http
+GET /biometrico/compare-hikdoc-pre-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Pre-student's CI (identification number)
+</ParamField>
+
+<ParamField query="v" type="number">
+  Cache-busting parameter (timestamp)
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_pre_foto.vue:497`
+
+### Sync Pre-Student to HikCentral
+
+Synchronizes a pre-student's data to the HikCentral biometric system.
+
+```http
+POST /biometrico/sync-hikcentral-pre-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Pre-student's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_pre_foto.vue:473`
+
+### Sync Pre-Student with ID
+
+Synchronizes a pre-student's data including their ID.
+
+```http
+POST /biometrico/sync-hikdoc-est-id-pre-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Pre-student's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivPreEst.vue:323`
+
+### Update Pre-Student in HikCentral
+
+Updates an existing pre-student's data in the HikCentral system.
+
+```http
+POST /biometrico/sync-hikdoc-update-pre-est/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Pre-student's CI (identification number)
+</ParamField>
+
+**Source**: `src/components/Registro/RegistroIndivPreEst.vue:372`
+
+### Get Pending Sync Pre-Students
+
+Retrieves list of pre-students pending synchronization with HikCentral.
+
+```http
+GET /biometrico/get-pending-sync-pre-est
+```
+
+<ParamField query="page" type="number">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="perPage" type="number">
+  Number of records per page
+</ParamField>
+
+**Source**: `src/components/fotos/estudiantes_pre_foto.vue:389`
+
+## Shared Endpoints
+
+### Get Careers List
+
+Retrieves a list of available careers/programs.
+
+```http
+GET /biometrico/carrerasList
+```
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:522`
+
+### Get Photo
+
+Retrieves a photo for a person by their CI.
+
+```http
+GET /biometrico/fotografia/{ci}
+```
+
+<ParamField path="ci" type="string" required>
+  Person's CI (identification number)
+</ParamField>
+
+<ParamField query="responseType" type="string" default="blob">
+  Response type for the image data
+</ParamField>
+
+**Response**: Image file (binary data)
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:617`
+
+### Download Photos (Bulk)
+
+Downloads a ZIP file containing multiple photos.
+
+```http
+GET /biometrico/descargarfotosmasiva
+```
+
+<ParamField query="carreras" type="array">
+  List of career/program IDs to filter
+</ParamField>
+
+<ParamField query="periodo" type="string">
+  Academic period
+</ParamField>
+
+<ParamField query="responseType" type="string" default="blob">
+  Response type (should be "blob" for binary data)
+</ParamField>
+
+**Response**: ZIP file (binary data)
+
+**Source**: `src/components/fotos/estudiantes_foto.vue:655`
+
+## Common Request Patterns
+
+### Pagination
+
+Many endpoints support pagination using query parameters:
+
+```javascript
+const response = await API.get('/biometrico/getdocentes', {
+  params: {
+    page: 1,
+    perPage: 50,
+    search: 'John'
+  }
+});
+```
+
+### Cache Busting
+
+Several endpoints use a version parameter to bypass caching:
+
+```javascript
+const refreshKey = Date.now();
+const response = await API.get(`/biometrico/getperson/${ci}?v=${refreshKey}`);
+```
+
+### File Downloads
+
+For endpoints that return files, use `responseType: 'blob'`:
+
+```javascript
+const response = await API.get('/biometrico/fotografia/1234567', {
+  responseType: 'blob'
+});
+```
+
+## Error Responses
+
+All endpoints may return the following error responses:
+
+<ResponseField name="401" type="error">
+  Unauthorized - Invalid or expired token. User will be automatically redirected to login.
+</ResponseField>
+
+<ResponseField name="404" type="error">
+  Not Found - The requested resource does not exist.
+</ResponseField>
+
+<ResponseField name="500" type="error">
+  Internal Server Error - An error occurred on the server.
+</ResponseField>
+
+## Notes
+
+- All endpoints require authentication except for the login endpoint
+- The Authorization header is automatically added by the Axios interceptor
+- CI (Cédula de Identidad) is used as the primary identifier for people
+- HikCentral is the external biometric system that data is synchronized with
+- Pre-students are applicants or pre-enrolled students not yet fully registered

@@ -1,0 +1,223 @@
+---
+title: ThemeToggler
+description: Dark/light theme toggle component with automatic theme persistence
+---
+
+## Overview
+
+The `ThemeToggler` component provides a simple button to toggle between light and dark themes in the application.
+
+## Component Location
+
+```
+src/components/common/ThemeToggler.vue
+```
+
+## Features
+
+- One-click theme switching
+- Sun/moon icon toggle
+- Smooth transitions
+- Dark mode support via Tailwind
+- Theme persistence (via ThemeProvider)
+
+## Usage
+
+```vue
+<template>
+  <ThemeToggler />
+</template>
+
+<script setup>
+import ThemeToggler from '@/components/common/ThemeToggler.vue'
+</script>
+```
+
+## Template
+
+```vue
+<template>
+  <button
+    class="relative flex items-center justify-center 
+           text-gray-500 transition-colors bg-white border 
+           border-gray-200 rounded-full hover:text-dark-900 
+           h-11 w-11 hover:bg-gray-100 hover:text-gray-700 
+           dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 
+           dark:hover:bg-gray-800 dark:hover:text-white"
+    @click.prevent="toggleTheme"
+  >
+    <!-- Sun Icon (Dark Mode Active) -->
+    <svg
+      class="hidden dark:block"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <!-- Sun icon paths -->
+    </svg>
+    
+    <!-- Moon Icon (Light Mode Active) -->
+    <svg
+      class="dark:hidden"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <!-- Moon icon paths -->
+    </svg>
+  </button>
+</template>
+```
+
+## Script
+
+```vue
+<script setup>
+import { useTheme } from '../layout/ThemeProvider.vue'
+
+const { toggleTheme } = useTheme()
+</script>
+```
+
+## ThemeProvider Integration
+
+The component uses the `useTheme` composable from `ThemeProvider.vue`:
+
+```javascript
+// Example ThemeProvider composable
+export function useTheme() {
+  const theme = ref(localStorage.getItem('theme') || 'light')
+  
+  const toggleTheme = () => {
+    theme.value = theme.value === 'light' ? 'dark' : 'light'
+    localStorage.setItem('theme', theme.value)
+    
+    if (theme.value === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
+  
+  return { theme, toggleTheme }
+}
+```
+
+## Styling
+
+### Button States
+
+```css
+/* Base */
+.h-11 w-11                /* Size */
+.rounded-full             /* Circular shape */
+.border border-gray-200   /* Border */
+
+/* Light Mode */
+.bg-white                 /* Background */
+.text-gray-500            /* Icon color */
+.hover:bg-gray-100        /* Hover background */
+.hover:text-gray-700      /* Hover text */
+
+/* Dark Mode */
+.dark:bg-gray-900         /* Background */
+.dark:text-gray-400       /* Icon color */
+.dark:border-gray-800     /* Border */
+.dark:hover:bg-gray-800   /* Hover background */
+.dark:hover:text-white    /* Hover text */
+```
+
+### Icon Toggle
+
+```css
+.hidden dark:block    /* Show in dark mode */
+.dark:hidden          /* Hide in dark mode */
+```
+
+## Complete Example
+
+```vue
+<template>
+  <div class="app-header">
+    <div class="flex items-center gap-2">
+      <!-- Other header items -->
+      <ThemeToggler />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import ThemeToggler from '@/components/common/ThemeToggler.vue'
+</script>
+```
+
+## Customization
+
+### Custom Colors
+
+```vue
+<button
+  class="bg-blue-500 hover:bg-blue-600 dark:bg-blue-700"
+  @click="toggleTheme"
+>
+  <!-- icons -->
+</button>
+```
+
+### Custom Size
+
+```vue
+<button
+  class="h-8 w-8"  <!-- Smaller -->
+  @click="toggleTheme"
+>
+  <svg width="16" height="16">...</svg>
+</button>
+```
+
+### With Label
+
+```vue
+<button 
+  class="flex items-center gap-2 px-4 py-2"
+  @click="toggleTheme"
+>
+  <svg>...</svg>
+  <span>Toggle Theme</span>
+</button>
+```
+
+## Icons
+
+### Sun Icon (Dark Mode)
+
+Displayed when dark mode is active, clicking switches to light mode.
+
+### Moon Icon (Light Mode)
+
+Displayed when light mode is active, clicking switches to dark mode.
+
+## Browser Support
+
+The component uses:
+- CSS custom properties (for theme variables)
+- localStorage (for theme persistence)
+- Tailwind's dark mode class strategy
+
+## Accessibility
+
+Consider adding ARIA attributes:
+
+```vue
+<button
+  @click.prevent="toggleTheme"
+  aria-label="Toggle theme"
+  :aria-pressed="isDark"
+>
+  <!-- icons -->
+</button>
+```

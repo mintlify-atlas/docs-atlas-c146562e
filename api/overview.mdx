@@ -1,0 +1,80 @@
+---
+title: API Overview
+description: Overview of the Biométrico API architecture and components
+---
+
+## Architecture
+
+The Biométrico application uses a modern Vue.js 3 frontend architecture with the following key components:
+
+- **Vuex Store**: Centralized state management for authentication and user data
+- **Vue Router**: Client-side routing for navigation
+- **Axios**: HTTP client for API communication with the backend
+- **LocalStorage**: Persistent storage for authentication tokens and user information
+
+## Core Components
+
+### State Management
+
+The application uses Vuex for managing global application state, primarily focused on:
+- User authentication state
+- User profile information (role, email, name, ID)
+- JWT token management
+
+See [Vuex Store](/api/vuex-store) for detailed documentation.
+
+### API Communication
+
+All API requests go through a configured Axios instance that:
+- Automatically attaches authentication tokens to requests
+- Handles token expiration and session management
+- Provides centralized error handling
+- Sets a 90-second timeout for all requests
+
+See [Axios Configuration](/api/axios-configuration) for implementation details.
+
+### Routing
+
+The application uses Vue Router with web history mode for:
+- Login and authentication flows
+- Photo management for students (regular and pre-students) and teachers
+- Individual registration pages
+
+See [Routing](/api/routing) for all available routes.
+
+## API Base Configuration
+
+The API base URL is configured using the environment variable `__API_BIOMETRICO__`:
+
+```javascript
+const API = axios.create({
+  baseURL: `${__API_BIOMETRICO__}`,
+  timeout: 90000,
+});
+```
+
+## Authentication Flow
+
+1. User submits login credentials
+2. Backend validates and returns JWT token
+3. Token is stored in Vuex store and localStorage
+4. All subsequent API requests include the token in the Authorization header
+5. On 401 errors, user is automatically logged out and redirected to login
+
+## Key Features
+
+- **Biometric Photo Management**: Upload, sync, and manage biometric photos for students and teachers
+- **HikCentral Integration**: Synchronization with HikCentral biometric system
+- **Bulk Operations**: Mass download and sync of photos
+- **Role-Based Access**: Support for different user roles (sotics, atics, sa)
+
+## API Endpoints
+
+The backend provides endpoints for:
+- Authentication and session management
+- Student and teacher data retrieval
+- Photo upload and download
+- HikCentral synchronization
+- Data comparison and validation
+
+See [API Endpoints](/api/api-endpoints) for a complete list of available endpoints.

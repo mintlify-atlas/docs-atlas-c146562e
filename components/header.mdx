@@ -1,0 +1,176 @@
+---
+title: Header
+description: Application header component with navigation toggle, logo, and theme controls
+---
+
+## Overview
+
+The `AppHeader` component provides the top navigation bar for the application, including a sidebar toggle button, logo, theme switcher, and user menu.
+
+## Component Location
+
+```
+src/components/layout/AppHeader.vue
+```
+
+## Features
+
+- Responsive sidebar toggle (desktop/mobile)
+- Application logo
+- Dark/light theme toggle
+- User menu
+- Application menu for mobile
+- Sticky positioning
+
+## Usage
+
+```vue
+<template>
+  <app-header />
+</template>
+
+<script setup>
+import AppHeader from '@/components/layout/AppHeader.vue'
+</script>
+```
+
+## Template Structure
+
+```vue
+<template>
+  <header class="sticky top-0 flex w-full bg-white border-gray-200 z-99999 
+                 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
+    <div class="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
+      <!-- Toggle Button -->
+      <button @click="handleToggle">...</button>
+      
+      <!-- Logo -->
+      <HeaderLogo />
+      
+      <!-- Application Menu Toggle (Mobile) -->
+      <button @click="toggleApplicationMenu">...</button>
+      
+      <!-- Title -->
+      <span>Panel Administrativo - Acceso Facial</span>
+      
+      <!-- Theme & User Menu -->
+      <div class="items-center justify-between">
+        <ThemeToggler />
+        <UserMenu />
+      </div>
+    </div>
+  </header>
+</template>
+```
+
+## Script Setup
+
+```javascript
+import { ref } from 'vue'
+import { useSidebar } from '@/composables/useSidebar'
+import ThemeToggler from '../common/ThemeToggler.vue'
+import HeaderLogo from './header/HeaderLogo.vue'
+import UserMenu from './header/UserMenu.vue'
+
+// Sidebar Composable
+const { toggleSidebar, toggleMobileSidebar, isMobileOpen } = useSidebar()
+
+// Toggle handler - responsive behavior
+const handleToggle = () => {
+  if (window.innerWidth >= 1024) {
+    toggleSidebar()
+  } else {
+    toggleMobileSidebar()
+  }
+}
+
+// Application menu state
+const isApplicationMenuOpen = ref(false)
+
+const toggleApplicationMenu = () => {
+  isApplicationMenuOpen.value = !isApplicationMenuOpen.value
+}
+```
+
+## Reactive State
+
+| State | Type | Description |
+|-------|------|-------------|
+| `dropdownOpen` | `ref(false)` | Dropdown menu state |
+| `notifying` | `ref(false)` | Notification state |
+| `isApplicationMenuOpen` | `ref(false)` | Mobile application menu state |
+
+## Methods
+
+### handleToggle()
+
+Toggles the sidebar based on screen size:
+- **Desktop (≥1024px)**: Toggles sidebar expansion
+- **Mobile (<1024px)**: Shows/hides mobile sidebar
+
+```javascript
+const handleToggle = () => {
+  if (window.innerWidth >= 1024) {
+    toggleSidebar()
+  } else {
+    toggleMobileSidebar()
+  }
+}
+```
+
+### toggleApplicationMenu()
+
+Toggles the application menu visibility on mobile devices.
+
+```javascript
+const toggleApplicationMenu = () => {
+  isApplicationMenuOpen.value = !isApplicationMenuOpen.value
+}
+```
+
+## Child Components
+
+### ThemeToggler
+
+Provides dark/light theme switching functionality. See [ThemeToggler documentation](theme-toggler) for details.
+
+### HeaderLogo
+
+Displays the application logo with routing to home page.
+
+### UserMenu
+
+Displays user information and account options.
+
+## Responsive Behavior
+
+### Desktop (lg and above)
+- Full header with all elements visible
+- Sidebar toggle expands/collapses sidebar
+- Application menu always visible
+
+### Mobile
+- Compact header layout
+- Toggle button shows/hides mobile sidebar
+- Application menu hidden behind toggle button
+- Title may be truncated
+
+## Styling
+
+Key classes:
+
+```css
+.sticky top-0        /* Sticky positioning */
+.z-99999             /* High z-index for layering */
+.bg-white            /* Light mode background */
+.dark:bg-gray-900    /* Dark mode background */
+.lg:border-b         /* Bottom border on desktop */
+```
+
+## Icons
+
+The header uses SVG icons for:
+- Menu toggle (hamburger/close icon)
+- Application menu (three dots)
+
+Icons automatically switch based on state and adapt to dark mode.

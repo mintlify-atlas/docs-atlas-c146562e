@@ -1,0 +1,267 @@
+---
+title: Sidebar
+description: Collapsible navigation sidebar with menu groups and dynamic item rendering
+---
+
+## Overview
+
+The `AppSidebar` component provides a responsive, collapsible navigation sidebar with menu groups, submenu support, and role-based filtering.
+
+## Component Location
+
+```
+src/components/layout/AppSidebar.vue
+```
+
+## Features
+
+- Collapsible sidebar (expanded/collapsed states)
+- Hover-to-expand when collapsed
+- Menu groups with submenus
+- Role-based menu filtering
+- Active route highlighting
+- Smooth transitions
+- Mobile responsive
+- Optional sidebar widget
+
+## Usage
+
+```vue
+<template>
+  <app-sidebar />
+</template>
+
+<script setup>
+import AppSidebar from '@/components/layout/AppSidebar.vue'
+</script>
+```
+
+## Sidebar States
+
+The sidebar has three main states:
+
+1. **Expanded** - Full width (290px) with text labels
+2. **Collapsed** - Icon-only (90px)
+3. **Hovered** - Temporarily expanded when hovering collapsed sidebar
+
+## Menu Structure
+
+```javascript
+const menuData = [
+  {
+    title: "Menu",
+    items: [
+      {
+        icon: GridIcon,
+        name: "Principal",
+        path: "/home",
+      },
+      {
+        icon: UserCircleIcon,
+        name: "Fotos",
+        subItems: [
+          { name: "Estudiantes", path: "/estudiantes_pictures" },
+          { name: "Docentes", path: "/docentes_pictures" },
+        ],
+      },
+      {
+        icon: UserCircleIcon,
+        name: "Registro Individual",
+        subItems: [
+          { name: "Estudiantes", path: "/estudiantes_registro" },
+          { name: "Personal UTLVTE", path: "/docentes_registro" },
+        ],
+      },
+    ],
+  },
+]
+```
+
+## Role-Based Filtering
+
+The sidebar filters menu items based on user role:
+
+```javascript
+import { useUsuario } from '@/composables/useUsuario'
+
+const { rolUsuario } = useUsuario()
+
+const menuGroups = computed(() => {
+  const rol = rolUsuario.value;
+  
+  // sa (super admin) or atics (tech admin) - see all
+  if (rol === 'sa' || rol === 'atics') {
+    return menuData;
+  }
+  
+  // sotics - filtered view
+  return menuData.map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      if (rol === 'sotics') {
+        return item.name === "Registro Individual" || item.name === "Principal";
+      }
+      return true;
+    })
+  })).filter(group => group.items.length > 0);
+});
+```
+
+## Composables
+
+### useSidebar
+
+```javascript
+import { useSidebar } from '@/composables/useSidebar'
+
+const { isExpanded, isMobileOpen, isHovered, openSubmenu } = useSidebar()
+```
+
+**Properties:**
+- `isExpanded` - Desktop sidebar expanded state
+- `isMobileOpen` - Mobile sidebar visibility
+- `isHovered` - Hover state for collapsed sidebar
+- `openSubmenu` - Currently open submenu key
+
+## Methods
+
+### toggleSubmenu(groupIndex, itemIndex)
+
+Toggles a submenu's open/closed state:
+
+```javascript
+const toggleSubmenu = (groupIndex, itemIndex) => {
+  const key = `${groupIndex}-${itemIndex}`;
+  openSubmenu.value = openSubmenu.value === key ? null : key;
+};
+```
+
+### isActive(path)
+
+Checks if a route is currently active:
+
+```javascript
+const isActive = (path) => route.path === path;
+```
+
+### isSubmenuOpen(groupIndex, itemIndex)
+
+Determines if a submenu should be open:
+
+```javascript
+const isSubmenuOpen = (groupIndex, itemIndex) => {
+  const key = `${groupIndex}-${itemIndex}`;
+  return (
+    openSubmenu.value === key ||
+    (isAnySubmenuRouteActive.value &&
+      menuData[groupIndex].items[itemIndex].subItems?.some((subItem) =>
+        isActive(subItem.path)
+      ))
+  );
+};
+```
+
+## Template Example
+
+```vue
+<template>
+  <aside :class="[
+    'fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white',
+    {
+      'lg:w-[290px]': isExpanded || isMobileOpen || isHovered,
+      'lg:w-[90px]': !isExpanded && !isHovered,
+      'translate-x-0 w-[290px]': isMobileOpen,
+      '-translate-x-full': !isMobileOpen,
+    },
+  ]" 
+  @mouseenter="!isExpanded && (isHovered = true)" 
+  @mouseleave="isHovered = false">
+    
+    <!-- Logo -->
+    <div class="py-8 flex">
+      <router-link to="/">
+        <img v-if="isExpanded || isHovered || isMobileOpen" 
+             src="@/assets/images/logo/logo.svg" />
+        <img v-else src="@/assets/images/logo/logo-icon.svg" />
+      </router-link>
+    </div>
+    
+    <!-- Navigation -->
+    <nav>
+      <div v-for="(menuGroup, groupIndex) in menuGroups" :key="groupIndex">
+        <h2>{{ menuGroup.title }}</h2>
+        <ul>
+          <li v-for="(item, index) in menuGroup.items" :key="item.name">
+            <!-- Menu items -->
+          </li>
+        </ul>
+      </div>
+    </nav>
+    
+    <!-- Sidebar Widget -->
+    <SidebarWidget v-if="isExpanded || isHovered || isMobileOpen" />
+  </aside>
+</template>
+```
+
+## Transitions
+
+Smooth submenu transitions:
+
+```javascript
+const startTransition = (el) => {
+  el.style.height = "auto";
+  const height = el.scrollHeight;
+  el.style.height = "0px";
+  el.offsetHeight; // force reflow
+  el.style.height = height + "px";
+};
+
+const endTransition = (el) => {
+  el.style.height = "";
+};
+```
+
+## Icons
+
+Imported from the icons directory:
+
+```javascript
+import {
+  GridIcon,
+  CalenderIcon,
+  UserCircleIcon,
+  ChatIcon,
+  MailIcon,
+  DocsIcon,
+  PieChartIcon,
+  ChevronDownIcon,
+  HorizontalDots,
+  // ...
+} from "../../icons";
+```
+
+## Styling
+
+### Menu Item States
+
+```css
+.menu-item-active      /* Active menu item */
+.menu-item-inactive    /* Inactive menu item */
+.menu-item-icon-active /* Active icon style */
+.menu-item-icon-inactive /* Inactive icon style */
+.menu-dropdown-item    /* Submenu item */
+.menu-dropdown-badge   /* Badge for 'new' or 'pro' labels */
+```
+
+## Responsive Behavior
+
+### Desktop
+- Fixed sidebar on left
+- Toggles between 90px and 290px
+- Hover to temporarily expand
+
+### Mobile
+- Sidebar hidden by default
+- Slides in from left when opened
+- Full-width overlay

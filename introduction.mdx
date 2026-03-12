@@ -1,0 +1,131 @@
+---
+title: Introduction
+description: Overview of the Biométrico facial recognition system for educational institutions
+---
+
+# Biométrico - Facial Recognition System
+
+Biométrico is a comprehensive facial recognition and biometric management system designed for educational institutions. It provides secure access control and identity verification for students and faculty members through facial recognition technology integrated with HikCentral.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Facial Recognition" icon="face-smile">
+    Advanced biometric authentication using HikCentral integration for secure access control
+  </Card>
+  
+  <Card title="Student Management" icon="graduation-cap">
+    Complete student registration system with photo capture and SIAD integration
+  </Card>
+  
+  <Card title="Faculty Management" icon="chalkboard-user">
+    Teacher and staff registration with biometric data synchronization
+  </Card>
+  
+  <Card title="Role-Based Access" icon="shield-check">
+    Secure authentication with role-based permissions (sotics, atics, sa)
+  </Card>
+</CardGroup>
+
+## System Architecture
+
+Biométrico is built with modern web technologies to ensure performance, security, and scalability:
+
+### Frontend Stack
+
+- **Vue 3.4.0** - Progressive JavaScript framework with Composition API
+- **Vue Router 4.0.3** - Official routing solution
+- **Vuex 4.0.0** - State management for authentication and user data
+- **Tailwind CSS 4.1.17** - Utility-first CSS framework
+- **Bootstrap 5.3.8** - UI component framework
+
+### Key Libraries
+
+- **Axios 1.13.2** - HTTP client for API communication
+- **SweetAlert2 11.26.3** - Beautiful, responsive alert dialogs
+- **ApexCharts 5.3.6** - Modern charting library
+- **QRCode 1.5.4** - QR code generation
+- **ExcelJS 4.4.0** - Excel file generation and export
+- **jsPDF 2.5.1** - PDF document generation
+
+## Core Components
+
+### Authentication System
+
+The system implements a secure token-based authentication flow:
+
+```javascript
+// Token storage in localStorage
+const token = localStorage.getItem('token_bio');
+const tokenType = localStorage.getItem('token_type_bio');
+
+// Authorization header injection
+config.headers.Authorization = `${tokenType} ${token}`;
+```
+
+### User Roles
+
+Three primary roles control system access:
+
+- **sotics** - IT Department staff
+- **atics** - Administrative IT staff  
+- **sa** - System administrators
+
+<Warning>
+  Only users with valid credentials and approved roles can access the system. Contact the IT Department (Dirección de TIC) for account provisioning.
+</Warning>
+
+## Integration Points
+
+### SIAD Integration
+
+Biométrico integrates with SIAD (Sistema Integrado Académico) to:
+
+- Retrieve student personal information
+- Sync institutional email addresses
+- Access academic program enrollment data
+- Import student photographs
+
+### HikCentral Integration
+
+The system synchronizes biometric data with HikCentral for:
+
+- Facial recognition database management
+- Access control device configuration
+- Real-time verification status
+- Photo comparison (SIAD vs HikCentral)
+
+<Note>
+  After verifying student or faculty information, you must click "Sincronizar HK" to push the data to the HikCentral facial recognition system.
+</Note>
+
+## API Configuration
+
+The system uses a centralized API configuration:
+
+```javascript
+// API base URL (configured via webpack)
+const API_URL = process.env.NODE_ENV === 'production'
+  ? 'http://192.168.1.112:8000/api'
+  : 'http://192.168.1.112:8000/api';
+```
+
+## Navigation Structure
+
+The application provides dedicated interfaces for:
+
+- **Home Dashboard** - Overview and system statistics
+- **Student Registration** - Individual student photo registration
+- **Pre-enrolled Students** - Pre-enrollment photo management
+- **Faculty Registration** - Teacher and staff biometric setup
+- **Photo Management** - Batch photo operations
+
+## Getting Started
+
+To begin using Biométrico:
+
+1. Obtain credentials from the IT Department
+2. Access the login portal at `/biometrico`
+3. Complete your first registration following the [Quickstart Guide](/quickstart)
+
+For installation and development setup, see the [Installation Guide](/installation).

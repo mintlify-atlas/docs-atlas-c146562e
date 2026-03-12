@@ -1,0 +1,343 @@
+---
+title: API Configuration
+description: Configure API endpoints and authentication for the Biométrico system
+---
+
+## API Setup
+
+The Biométrico application uses Axios for HTTP requests with custom interceptors for authentication and error handling.
+
+## Base Configuration
+
+### Axios Instance
+
+The API is configured in `src/assets/js/services/axios.js`:
+
+```javascript
+import axios from "axios";
+
+const API = axios.create({
+  baseURL: `${__API_BIOMETRICO__}`,
+  timeout: 90000, // 90 seconds
+});
+
+export default API;
+```
+
+### Environment Variables
+
+The API base URL is defined in `vue.config.js` using Webpack's DefinePlugin:
+
+```javascript
+new webpack.DefinePlugin({
+  __API_BIOMETRICO__: JSON.stringify(
+    process.env.NODE_ENV === 'production'
+      ? 'http://192.168.1.112:8000/api'
+      : 'http://192.168.1.112:8000/api'
+  ),
+})
+```
+
+<Note>
+**Production vs Development**: Currently both environments use the same API URL. Update the production URL as needed for your deployment.
+</Note>
+
+## Authentication
+
+### Request Interceptor
+
+The API automatically adds authentication headers to all requests:
+
+```javascript
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token_bio");
+    const tokenType = localStorage.getItem("token_type_bio");
+
+    if (token && tokenType) {
+      config.headers.Authorization = `${tokenType} ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    console.error("❌ Error en la solicitud:", error);
+    return Promise.reject(error);
+  }
+);
+```
+
+### Token Storage
+
+Tokens are stored in localStorage:
+
+```javascript
+// Store tokens after login
+localStorage.setItem("token_bio", accessToken);
+localStorage.setItem("token_type_bio", "Bearer");
+
+// Retrieve tokens
+const token = localStorage.getItem("token_bio");
+const tokenType = localStorage.getItem("token_type_bio");
+
+// Clear tokens on logout
+localStorage.removeItem("token_bio");
+localStorage.removeItem("token_type_bio");
+```
+
+## Response Interceptor
+
+### Error Handling
+
+The response interceptor handles common HTTP errors:
+
+```javascript
+API.interceptors.response.use(
+  (response) => response, // Pass through successful responses
+  (error) => {
+    if (error.response) {
+      console.warn("⚠️ Error en respuesta del servidor:", {
+        status: error.response.status,
+        data: error.response.data,
+        url: error.config.url,
+      });
+
+      // Handle 401 Unauthorized
+      if (error.response.status === 401) {
+        console.warn("🔒 Sesión expirada. Cerrando sesión...");
+        localStorage.removeItem("token_bio");
+        localStorage.removeItem("token_type_bio");
+        window.location.href = "/biometrico";
+      }
+    } else if (error.request) {
+      console.error("📡 No hubo respuesta del servidor:", error.request);
+    } else {
+      console.error("⚙️ Error al configurar la solicitud:", error.message);
+    }
+
+    return Promise.reject(error);
+  }
+);
+```
+
+### HTTP Status Codes
+
+| Status | Description | Handler |
+|--------|-------------|----------|
+| **200** | Success | Pass through |
+| **401** | Unauthorized | Clear tokens and redirect to login |
+| **429** | Too Many Requests | Logged to console |
+| **500** | Server Error | Logged to console |
+
+## API Endpoints
+
+### Authentication
+
+```javascript
+// Login
+POST /api/login
+{
+  "email": "user@example.com",
+  "password": "password"
+}
+
+// Response
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+### Student Photos
+
+```javascript
+// Get students with photos (paginated)
+GET /api/biometrico/estudiantesfoto?page=1&search_query=&carrera_name=
+
+// Response
+{
+  "data": [
+    {
+      "CIInfPer": "1234567890",
+      "NombInfPer": "John",
+      "ApellInfPer": "Doe",
+      "ApellMatInfPer": "Smith",
+      "NombCarr": "Computer Science",
+      "mailInst": "john.doe@example.com",
+      "hasPhoto": true
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 10,
+    "total": 100
+  }
+}
+```
+
+### Photo Retrieval
+
+```javascript
+// Get photo from SIAD
+GET /api/biometrico/fotografia/{ci}
+// Returns: image/jpeg or image/png binary data
+
+// Get photo from HikCentral
+GET /api/biometrico/gethick/{ci}
+// Returns: image/jpeg or image/png binary data
+```
+
+### HikCentral Sync
+
+```javascript
+// Sync single user
+POST /api/biometrico/sync-hikdoc/{ci}
+
+// Get pending users
+GET /api/biometrico/get-pending-sync-est?carrera_name=
+
+// Verify registration
+GET /api/biometrico/getperson-est/{ci}
+
+// Compare photos
+GET /api/biometrico/compare-hikdoc-est/{ci}
+```
+
+### Bulk Download
+
+```javascript
+// Download all photos with metadata
+GET /api/biometrico/descargarfotosmasiva
+// Returns: JSON with base64 encoded photos
+```
+
+## Configuration Options
+
+### Timeout Settings
+
+```javascript
+const API = axios.create({
+  baseURL: `${__API_BIOMETRICO__}`,
+  timeout: 90000, // 90 seconds for standard requests
+});
+
+// For bulk operations, override timeout:
+const response = await API.get('/descargarfotosmasiva', {
+  timeout: 600000, // 10 minutes
+});
+```
+
+### Request Parameters
+
+```javascript
+// Example: Search with filters
+const params = {
+  page: 1,
+  search_query: "John",
+  carrera_name: "Computer Science",
+};
+
+const response = await API.get('/biometrico/estudiantesfoto', {
+  params
+});
+```
+
+### Response Types
+
+```javascript
+// For binary data (images, files)
+const response = await API.get('/biometrico/fotografia/1234567890', {
+  responseType: "blob",
+});
+
+// For JSON data (default)
+const response = await API.get('/biometrico/estudiantesfoto');
+```
+
+## Dev Server Proxy
+
+For development, configure proxy in `vue.config.js`:
+
+```javascript
+devServer: {
+  proxy: {
+    '/api': {
+      target: 'http://biometricobackend.test',
+      changeOrigin: true,
+      pathRewrite: { '^/api': '' },
+    },
+  },
+}
+```
+
+## Usage Examples
+
+### Making API Requests
+
+```javascript
+import API from "@/assets/js/services/axios";
+
+// GET request
+async function getStudents() {
+  try {
+    const response = await API.get('/biometrico/estudiantesfoto', {
+      params: { page: 1 }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching students:', error);
+    throw error;
+  }
+}
+
+// POST request
+async function syncStudent(ci) {
+  try {
+    const response = await API.post(`/biometrico/sync-hikdoc/${ci}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error syncing student:', error);
+    throw error;
+  }
+}
+```
+
+### Handling Binary Data
+
+```javascript
+async function downloadPhoto(ci) {
+  try {
+    const response = await API.get(`/biometrico/fotografia/${ci}`, {
+      responseType: "blob",
+    });
+
+    const contentType = response.headers["content-type"] || "image/jpeg";
+    const blob = new Blob([response.data], { type: contentType });
+    
+    // Use file-saver to download
+    saveAs(blob, `photo_${ci}.jpg`);
+  } catch (error) {
+    console.error('Error downloading photo:', error);
+  }
+}
+```
+
+## Security Considerations
+
+<Warning>
+**Token Security**: Tokens are stored in localStorage. Consider using httpOnly cookies for enhanced security in production.
+</Warning>
+
+### Best Practices
+
+1. **HTTPS Only**: Always use HTTPS in production
+2. **Token Refresh**: Implement token refresh mechanism
+3. **Secure Storage**: Consider more secure token storage options
+4. **CORS Configuration**: Ensure proper CORS settings on backend
+5. **Rate Limiting**: Implement client-side rate limiting for sensitive operations
+
+## Next Steps
+
+- Learn about [HikCentral integration](/integration/hikcentral)
+- Check the [troubleshooting guide](/integration/troubleshooting)

@@ -1,0 +1,124 @@
+---
+title: AdminLayout
+description: Main admin dashboard layout component with sidebar, header, and content area
+---
+
+## Overview
+
+The `AdminLayout` component provides the main layout structure for the admin dashboard. It includes a collapsible sidebar, header, main content area, and footer.
+
+## Component Location
+
+```
+src/components/layout/AdminLayout.vue
+```
+
+## Features
+
+- Responsive layout with collapsible sidebar
+- Automatic sidebar width adjustment
+- Backdrop overlay for mobile navigation
+- Slot-based content insertion
+- User authentication check on mount
+
+## Usage
+
+```vue
+<template>
+  <AdminLayout>
+    <!-- Your page content goes here -->
+    <h1>Dashboard</h1>
+    <p>Welcome to the admin panel</p>
+  </AdminLayout>
+</template>
+
+<script setup>
+import AdminLayout from '@/components/layout/AdminLayout.vue'
+</script>
+```
+
+## Template Structure
+
+```vue
+<template>
+  <div class="min-h-screen xl:flex">
+    <app-sidebar />
+    <Backdrop />
+    <div class="flex-1 transition-all duration-300 ease-in-out"
+      :class="[isExpanded || isHovered ? 'lg:ml-[290px]' : 'lg:ml-[90px]']">
+      <app-header />
+      <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+        <slot></slot>
+      </div>
+      <footer class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 pt-0">
+        <!-- Footer content -->
+      </footer>
+    </div>
+  </div>
+</template>
+```
+
+## Composables Used
+
+### useSidebar
+
+The layout uses the `useSidebar` composable to manage sidebar state:
+
+```javascript
+import { useSidebar } from '@/composables/useSidebar'
+
+const { isExpanded, isHovered } = useSidebar()
+```
+
+**State Properties:**
+- `isExpanded` - Boolean indicating if sidebar is expanded
+- `isHovered` - Boolean indicating if sidebar is being hovered
+
+## Lifecycle Hooks
+
+```javascript
+export default {
+  async mounted() {
+    const usuario = await getMe();
+  }
+}
+```
+
+On component mount, the layout fetches the current user's information using the `getMe()` function from the auth store.
+
+## Layout Behavior
+
+### Desktop (lg and above)
+- Sidebar width: `290px` (expanded) or `90px` (collapsed)
+- Smooth transition between states
+- Hover to temporarily expand collapsed sidebar
+
+### Mobile
+- Sidebar is hidden by default
+- Toggle button in header shows/hides sidebar
+- Backdrop overlay when sidebar is open
+
+## Styling Classes
+
+Key Tailwind classes used:
+
+- `min-h-screen` - Full viewport height
+- `xl:flex` - Flex layout on extra-large screens
+- `transition-all duration-300 ease-in-out` - Smooth animations
+- `lg:ml-[290px]` / `lg:ml-[90px]` - Dynamic margin based on sidebar state
+
+## Child Components
+
+- **AppSidebar** - Navigation sidebar (~/workspace/docs/components/sidebar.mdx:1)
+- **AppHeader** - Top navigation header (~/workspace/docs/components/header.mdx:1)
+- **Backdrop** - Modal backdrop for mobile
+
+## Footer
+
+The layout includes a built-in footer:
+
+```html
+<footer>
+  <p>Designed and Developed by DonMonta ~ Distributed by UTLVTE.</p>
+</footer>
+```

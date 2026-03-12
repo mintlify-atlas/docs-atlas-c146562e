@@ -1,0 +1,270 @@
+---
+title: 'Daily Photo Management'
+description: 'Manage student and staff photos with search, filter, and individual sync workflows'
+---
+
+## Overview
+
+The photo management interface allows administrators to view, search, and synchronize student/staff photos between the SIAD database and HikCentral biometric system.
+
+## Photo List Interface
+
+The main photo management view (`estudiantes_foto.vue`) displays a paginated table with:
+
+- **Student photo from SIAD** (local database)
+- **Photo from HikCentral** (biometric system)
+- **Registration status** in HikCentral
+- **Career/Department filter**
+- **Real-time search** by CI (Cédula) or name
+
+### Component Structure
+
+```vue
+<template>
+  <div class="flex flex-col gap-4">
+    <!-- Search and Filter Section -->
+    <form class="flex-grow">
+      <input 
+        type="text" 
+        placeholder="Ingresa la cédula o nombre a buscar..." 
+        v-model="searchQuery"
+        @input="debouncedFilter"
+      />
+    </form>
+    
+    <!-- Career Filter -->
+    <select v-model="selectedCarrera" @change="debouncedFilter">
+      <option value="Todos">Todas las Carreras</option>
+      <option v-for="carrera in carrerasList" :value="carrera.id">
+        {{ carrera.nombre }}
+      </option>
+    </select>
+    
+    <!-- Photo Table -->
+    <table>
+      <!-- Student rows with photos -->
+    </table>
+  </div>
+</template>
+```
+
+## Search and Filter Workflow
+
+<Steps>
+  <Step title="Real-Time Search">
+    The search input uses a **debounced filter** (900ms delay) to avoid excessive API calls:
+
+    ```javascript
+    created() {
+      this.debouncedFilter = debounce(() => {
+        this.filterAndFetch();
+      }, 900);
+    }
+    ```
+
+    When users type in the search box, the system waits 900ms before sending a request to the backend.
+  </Step>
+
+  <Step title="Apply Filters">
+    The `filterAndFetch()` method resets to page 1 and fetches filtered results:
+
+    ```javascript
+    filterAndFetch() {
+      this.currentPage = 1;
+      this.getAdministrativosD(this.currentPage, this.searchQuery, this.selectedCarrera);
+    }
+    ```
+  </Step>
+
+  <Step title="Backend API Request">
+    The API endpoint receives search and filter parameters:
+
+    ```javascript
+    async getAdministrativosD(page = 1, searchQuery = "", carreraName = "Todos") {
+      const params = {
+        page: page,
+        search_query: searchQuery,
+        carrera_name: carreraName === 'Todos' ? '' : carreraName,
+      };
+
+      const response = await API.get(`${this.baseUrl}/estudiantesfoto`, { params });
+      this.filteredpostulaciones = response.data?.data || [];
+    }
+    ```
+  </Step>
+
+  <Step title="Display Results">
+    Results are displayed in a table with photos from both sources:
+
+    ```vue
+    <tr v-for="post in filteredpostulaciones" :key="post.CIInfPer">
+      <td>
+        <img :src="getPhotoUrl(post.CIInfPer)" /> <!-- SIAD Photo -->
+      </td>
+      <td>
+        <img :src="getPhotoUrl2(post.CIInfPer)" /> <!-- HikCentral Photo -->
+      </td>
+    </tr>
+    ```
+  </Step>
+</Steps>
+
+## Photo URL Generation
+
+Photos are loaded dynamically from the backend:
+
+```javascript
+getPhotoUrl(ci) {
+  const baseURL2 = API.defaults.baseURL;
+  return `${baseURL2}/biometrico/fotografia/${ci}?v=${this.refreshKey}`;
+}
+
+getPhotoUrl2(ci) {
+  const baseURL2 = API.defaults.baseURL;
+  return `${baseURL2}/biometrico/gethick/${ci}?v=${this.refreshKey}`;
+}
+```
+
+<Note>
+  The `refreshKey` is a timestamp that forces the browser to reload images when they change.
+</Note>
+
+## HikCentral Registration Status
+
+The system checks if each student is registered in HikCentral:
+
+```javascript
+async verificarRegistrosMasivos() {
+  const items = this.filteredpostulaciones;
+
+  for (let post of items) {
+    try {
+      const res = await API.get(`${this.baseUrl}/getperson-est/${post.CIInfPer}`);
+      post.estaRegistradoHC = res.data.registrado;
+    } catch (e) {
+      post.estaRegistradoHC = false;
+    }
+    
+    // 50ms delay to avoid overloading the server
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+}
+```
+
+### Status Display
+
+```vue
+<span v-if="post.estaRegistradoHC === null">
+  <svg class="animate-spin">...</svg> Verificando...
+</span>
+
+<span v-else-if="post.estaRegistradoHC === true" 
+      class="bg-green-100 text-green-800">
+  ✓ Sí
+</span>
+
+<span v-else class="bg-red-100 text-red-800">
+  ✗ No
+</span>
+```
+
+## Individual Photo Sync
+
+<Steps>
+  <Step title="Open Photo Details Modal">
+    Click on a student row to open the edit modal:
+
+    ```javascript
+    abrirModalEdicion(user) {
+      this.objetoeditar = {
+        CIInfPer: user.CIInfPer,
+        nombre_us: user.NombInfPer + ' ' + user.ApellMatInfPer + ' ' + user.ApellInfPer,
+        mailInst: user.mailInst,
+      };
+      this.$.setupState.isEditModalOpen = true;
+      this.verificarRegistroHC(user.CIInfPer);
+    }
+    ```
+  </Step>
+
+  <Step title="Compare Photos (Optional)">
+    Compare the SIAD photo with the HikCentral photo using facial recognition:
+
+    ```javascript
+    async ejecutarComparacion() {
+      this.comparando = true;
+      const ci = this.objetoeditar.CIInfPer;
+      const { data } = await API.get(`${this.baseUrl}/compare-hikdoc-est/${ci}`);
+
+      if (data.identicas) {
+        alert(`✅ Match: ${data.similitud} de similitud.`);
+      } else {
+        alert(`❌ Diferentes: Solo ${data.similitud} de parecido.`);
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Sync to HikCentral">
+    Register or update the photo in HikCentral:
+
+    ```javascript
+    async registrarEnHikCentral(post) {
+      if (!confirm(`¿Deseas registrar a ${post} en HikCentral?`)) return;
+
+      const response = await API.post(`${this.baseUrl}/sync-hikdoc/${post}`);
+
+      if (response.data.code === "0" || response.data.msg === "Success") {
+        alert(`✅ Registrado con éxito. ID en HC: ${response.data.data}`);
+        post.estaRegistradoHC = true;
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Pagination
+
+Navigate through pages of results:
+
+```javascript
+nextPage() {
+  if (this.currentPage < this.lastPage && !this.cargando) {
+    this.getAdministrativosD(this.currentPage + 1, this.searchQuery, this.selectedCarrera);
+  }
+}
+
+previousPage() {
+  if (this.currentPage > 1 && !this.cargando) {
+    this.getAdministrativosD(this.currentPage - 1, this.searchQuery, this.selectedCarrera);
+  }
+}
+```
+
+```vue
+<button @click="previousPage" :disabled="currentPage === 1">
+  <i class="fas fa-angle-left"></i>
+</button>
+<span>Página {{ currentPage }} de {{ lastPage }}</span>
+<button @click="nextPage" :disabled="currentPage === lastPage">
+  <i class="fas fa-angle-right"></i>
+</button>
+```
+
+## Image Error Handling
+
+If a photo fails to load, display a default avatar:
+
+```javascript
+handleImageError(event) {
+  event.target.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/User_icon_2.svg/480px-User_icon_2.svg.png";
+}
+```
+
+```vue
+<img :src="getPhotoUrl(post.CIInfPer)" @error="handleImageError" />
+```
+
+<Tip>
+  Use the `v` query parameter with a timestamp to bypass browser cache when photos are updated.
+</Tip>

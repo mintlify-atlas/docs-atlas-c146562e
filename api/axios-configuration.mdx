@@ -1,0 +1,368 @@
+---
+title: Axios Configuration
+description: HTTP client configuration and interceptors for API communication
+---
+
+## Overview
+
+The Biométrico application uses a configured Axios instance for all API communication. This instance includes automatic token injection, error handling, and session management.
+
+**Source**: `src/assets/js/services/axios.js`
+
+## Base Configuration
+
+The Axios instance is created with the following configuration:
+
+```javascript
+import axios from "axios";
+
+const API = axios.create({
+  baseURL: `${__API_BIOMETRICO__}`,
+  timeout: 90000,
+});
+```
+
+**Source**: `src/assets/js/services/axios.js:3-6`
+
+### Configuration Parameters
+
+<ParamField path="baseURL" type="string">
+  The base URL for all API requests, configured via the `__API_BIOMETRICO__` environment variable. All relative URLs in API calls will be appended to this base URL.
+</ParamField>
+
+<ParamField path="timeout" type="number" default="90000">
+  Request timeout in milliseconds (90 seconds). Requests that take longer will be automatically cancelled.
+</ParamField>
+
+## Request Interceptor
+
+The request interceptor automatically attaches authentication tokens to all outgoing requests.
+
+### Implementation
+
+```javascript
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token_bio");
+    const tokenType = localStorage.getItem("token_type_bio");
+
+    if (token && tokenType) {
+      config.headers.Authorization = `${tokenType} ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    console.error("❌ Error en la solicitud:", error);
+    return Promise.reject(error);
+  }
+);
+```
+
+**Source**: `src/assets/js/services/axios.js:8-23`
+
+### Behavior
+
+1. **Token Retrieval**: Retrieves `token_bio` and `token_type_bio` from localStorage
+2. **Header Injection**: If both values exist, adds them to the Authorization header in the format: `{tokenType} {token}` (e.g., "Bearer eyJhbGci...")
+3. **Error Handling**: Logs request configuration errors and rejects the promise
+
+### Example Headers
+
+With authentication:
+```http
+GET /biometrico/getdocentes HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+Without authentication:
+```http
+GET /biometrico/login HTTP/1.1
+Host: api.example.com
+```
+
+## Response Interceptor
+
+The response interceptor handles server errors, particularly authentication failures.
+
+### Implementation
+
+```javascript
+API.interceptors.response.use(
+  (response) => response, // deja pasar las respuestas correctas
+  (error) => {
+    if (error.response) {
+      console.warn("⚠️ Error en respuesta del servidor:", {
+        status: error.response.status,
+        data: error.response.data,
+        url: error.config.url,
+      });
+
+      // Puedes manejar ciertos códigos de error
+      if (error.response.status === 401) {
+        console.warn("🔒 Sesión expirada. Cerrando sesión...");
+        localStorage.removeItem("token_bio");
+        localStorage.removeItem("token_type_bio");
+        window.location.href = "/biometrico"; // Redirige al login si la sesión caduca
+      }
+    } else if (error.request) {
+      console.error("📡 No hubo respuesta del servidor:", error.request);
+    } else {
+      console.error("⚙️ Error al configurar la solicitud:", error.message);
+    }
+
+    return Promise.reject(error);
+  }
+);
+```
+
+**Source**: `src/assets/js/services/axios.js:25-50`
+
+### Error Handling Levels
+
+#### 1. Response Errors
+
+When the server responds with an error status code:
+
+<ResponseField name="status" type="number">
+  HTTP status code (e.g., 401, 404, 500)
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Response body containing error details
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The URL that was requested
+</ResponseField>
+
+**Logged as**: ⚠️ Error en respuesta del servidor
+
+#### 2. 401 Unauthorized Handling
+
+Special handling for authentication failures:
+
+```javascript
+if (error.response.status === 401) {
+  console.warn("🔒 Sesión expirada. Cerrando sesión...");
+  localStorage.removeItem("token_bio");
+  localStorage.removeItem("token_type_bio");
+  window.location.href = "/biometrico";
+}
+```
+
+**Actions**:
+1. Logs session expiration warning
+2. Removes authentication tokens from localStorage
+3. Redirects user to `/biometrico` (login page)
+
+**Source**: `src/assets/js/services/axios.js:36-41`
+
+#### 3. Network Errors
+
+When no response is received from the server (network failure, timeout, etc.):
+
+**Logged as**: 📡 No hubo respuesta del servidor
+
+#### 4. Request Configuration Errors
+
+When the request couldn't be configured properly:
+
+**Logged as**: ⚙️ Error al configurar la solicitud
+
+## Usage Examples
+
+### Basic GET Request
+
+```javascript
+import API from '@/assets/js/services/axios';
+
+try {
+  const response = await API.get('/biometrico/getdocentes', {
+    params: {
+      page: 1,
+      perPage: 50
+    }
+  });
+  console.log('Docentes:', response.data);
+} catch (error) {
+  console.error('Error fetching docentes:', error);
+}
+```
+
+### POST Request with Data
+
+```javascript
+import API from '@/assets/js/services/axios';
+
+try {
+  const response = await API.post('/biometrico/sync-hikcentral/1234567', {
+    forceUpdate: true
+  });
+  console.log('Sync result:', response.data);
+} catch (error) {
+  if (error.response && error.response.status === 401) {
+    // User will be automatically redirected to login
+    console.log('Session expired');
+  }
+}
+```
+
+### GET with Dynamic Parameters
+
+```javascript
+import API from '@/assets/js/services/axios';
+
+const ci = '1234567';
+const refreshKey = Date.now();
+
+try {
+  const response = await API.get(
+    `/biometrico/getperson/${ci}?v=${refreshKey}`
+  );
+  console.log('Person data:', response.data);
+} catch (error) {
+  console.error('Error:', error);
+}
+```
+
+**Source**: Similar to usage in `src/components/fotos/docentes_foto.vue:468`
+
+### File Download
+
+```javascript
+import API from '@/assets/js/services/axios';
+
+try {
+  const response = await API.get('/biometrico/descargarfotosmasivadoc', {
+    responseType: 'blob',
+    params: {
+      carreras: selectedCarreras,
+      periodo: selectedPeriodo
+    }
+  });
+  
+  // Create download link
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'fotos.zip');
+  document.body.appendChild(link);
+  link.click();
+} catch (error) {
+  console.error('Download error:', error);
+}
+```
+
+**Source**: Similar to usage in `src/components/fotos/docentes_foto.vue:660`
+
+## Advanced Features
+
+### Custom Request Configuration
+
+You can override the default configuration per request:
+
+```javascript
+const response = await API.get('/biometrico/endpoint', {
+  timeout: 120000, // Override timeout to 2 minutes
+  headers: {
+    'Custom-Header': 'value'
+  }
+});
+```
+
+### Request Cancellation
+
+```javascript
+const controller = new AbortController();
+
+try {
+  const response = await API.get('/biometrico/endpoint', {
+    signal: controller.signal
+  });
+} catch (error) {
+  if (axios.isCancel(error)) {
+    console.log('Request cancelled');
+  }
+}
+
+// Cancel the request
+controller.abort();
+```
+
+### Response Transformation
+
+Access various parts of the response:
+
+```javascript
+const response = await API.get('/biometrico/endpoint');
+
+console.log(response.data);       // Response body
+console.log(response.status);     // HTTP status code
+console.log(response.statusText); // HTTP status message
+console.log(response.headers);    // Response headers
+console.log(response.config);     // Request configuration
+```
+
+## Error Handling Best Practices
+
+### Handle Specific Error Codes
+
+```javascript
+try {
+  const response = await API.get('/biometrico/endpoint');
+  return response.data;
+} catch (error) {
+  if (error.response) {
+    switch (error.response.status) {
+      case 401:
+        // Handled automatically by interceptor
+        break;
+      case 404:
+        console.error('Resource not found');
+        break;
+      case 500:
+        console.error('Server error');
+        break;
+      default:
+        console.error('API error:', error.response.data);
+    }
+  } else if (error.request) {
+    console.error('Network error - no response received');
+  } else {
+    console.error('Request setup error:', error.message);
+  }
+}
+```
+
+### User-Friendly Error Messages
+
+```javascript
+try {
+  const response = await API.post('/biometrico/sync-hikcentral/123');
+  this.showSuccess('Synchronization complete');
+} catch (error) {
+  let errorMessage = 'An error occurred';
+  
+  if (error.response && error.response.data && error.response.data.message) {
+    errorMessage = error.response.data.message;
+  } else if (!error.response) {
+    errorMessage = 'Network error - please check your connection';
+  }
+  
+  this.showError(errorMessage);
+}
+```
+
+## Debugging
+
+The interceptors include console logging for debugging:
+
+- **Request errors**: ❌ Error en la solicitud
+- **Response errors**: ⚠️ Error en respuesta del servidor
+- **Session expiration**: 🔒 Sesión expirada. Cerrando sesión...
+- **Network errors**: 📡 No hubo respuesta del servidor
+- **Configuration errors**: ⚙️ Error al configurar la solicitud
+
+These messages appear in the browser console during development.

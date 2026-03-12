@@ -1,0 +1,337 @@
+---
+title: Teacher Registration
+description: Individual teacher/staff registration component with HikCentral integration
+---
+
+## Overview
+
+The `RegistroIndivDoc` component manages registration and photo synchronization for teachers and administrative staff with the HikCentral biometric system.
+
+## Component Location
+
+```
+src/components/Registro/RegistroIndivDoc.vue
+```
+
+## Features
+
+- Staff search by ID (cedula)
+- Staff type identification (Docente, Administrativo, Trabajador)
+- Personal information display
+- Photo comparison (SIAD vs HikCentral)
+- Facial similarity calculation
+- HikCentral registration/update
+- Real-time registration status
+
+## Usage
+
+```vue
+<template>
+  <RegistroIndivDoc />
+</template>
+
+<script setup>
+import RegistroIndivDoc from '@/components/Registro/RegistroIndivDoc.vue'
+</script>
+```
+
+## Data Properties
+
+```javascript
+data() {
+  return {
+    baseUrl: "/biometrico",
+    docenteData: null,
+    searchQuery: "",
+    cargando: false,
+    estaRegistrado: false,
+    cargandoStatus: false,
+    estencontrado: true,
+    comparando: false,
+    comparacionResultado: null,
+    personIdHC: null,
+  }
+}
+```
+
+## Staff Types
+
+The component recognizes four staff types:
+
+| Code | Type | Spanish Label |
+|------|------|---------------|
+| `D` | Teacher | Docente |
+| `A` | Administrative | Administrativo |
+| `T` | Worker | Trabajador |
+| `TDO` | Technical Teacher | Tecnico Docente |
+
+## Key Methods
+
+### buscarDocente()
+
+Searches for a staff member and verifies registration:
+
+```javascript
+async buscarDocente() {
+  if (this.searchQuery.length < 10) return;
+  
+  this.cargando = true;
+  this.docenteData = null;
+  this.comparacionResultado = null;
+  
+  try {
+    const response = await API.get(
+      `/biometrico/getindivDoc/${this.searchQuery}`
+    );
+    
+    if (!response.data || response.data.length === 0) {
+      this.estencontrado = false;
+    } else {
+      this.estencontrado = true;
+      this.docenteData = response.data;
+      await this.verificarRegistroHC(this.docenteData.CIInfPer);
+      if (this.estaRegistrado) {
+        await this.ejecutarComparacion(this.docenteData.CIInfPer);
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error al buscar:", error);
+    this.estencontrado = false;
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+### verificarRegistroHC(ci)
+
+Verifies HikCentral registration status:
+
+```javascript
+async verificarRegistroHC(ci) {
+  this.cargandoStatus = true;
+  try {
+    const response = await API.get(`${this.baseUrl}/getperson/${ci}`);
+    this.personIdHC = response.data.personId;
+    this.estaRegistrado = response.data.registrado;
+    console.log("PersonaID:", this.personIdHC);
+  } catch (error) {
+    this.estaRegistrado = false;
+  } finally {
+    this.cargandoStatus = false;
+  }
+}
+```
+
+### ejecutarComparacion(ci)
+
+Compares photos between systems:
+
+```javascript
+async ejecutarComparacion(ci) {
+  this.comparando = true;
+  try {
+    const { data } = await API.get(
+      `${this.baseUrl}/compare-hikdoc/${ci}`
+    );
+    
+    this.comparacionResultado = data;
+    if (data.identicas) {
+      console.log(`✅ Match: ${data.similitud}%`);
+    } else {
+      console.log(`❌ Diferentes: Solo ${data.similitud} de parecido.`);
+    }
+  } catch (error) {
+    alert("Error en la comparación");
+  } finally {
+    this.comparando = false;
+  }
+}
+```
+
+### registrarEnHikCentral(post)
+
+Registers staff member in HikCentral:
+
+```javascript
+async registrarEnHikCentral(post) {
+  if (!confirm(`¿Deseas registrar a ${post} en HikCentral?`)) return;
+  
+  this.cargando = true;
+  try {
+    const response = await API.post(
+      `${this.baseUrl}/sync-hikcentral/${post}`
+    );
+    
+    if (response.data.code === "0" || response.data.msg === "Success") {
+      alert(`✅ Registrado con éxito. ID en HC: ${response.data.data}`);
+      await this.verificarRegistroHC(this.docenteData.CIInfPer);
+      if (this.estaRegistrado) {
+        await this.ejecutarComparacion(this.docenteData.CIInfPer);
+      }
+    } else if (response.data.code === "131") {
+      alert(`⚠️ Usuario ya registrado en HikCentral.`);
+      this.estaRegistrado = true;
+    } else if (response.data.code === "128") {
+      alert("La foto no es compatible con HikCentral.");
+      this.estencontrado = false;
+    }
+  } catch (error) {
+    this.searchQuery = '';
+    this.estencontrado = false;
+  } finally {
+    this.cargando = false;
+    this.searchQuery = '';
+  }
+}
+```
+
+### UpdateEnHikCentral(post)
+
+Updates staff member's photo in HikCentral:
+
+```javascript
+async UpdateEnHikCentral(post) {
+  if (!this.personIdHC) {
+    alert("❌ No se encontró el PersonId de HikCentral.");
+    return;
+  }
+  
+  if (!confirm(`¿Deseas actualizar a ${post} en HikCentral?`)) return;
+  
+  this.cargando = true;
+  try {
+    const response = await API.post(
+      `${this.baseUrl}/sync-hikdupdatedoce/${post}`,
+      { personaId: this.personIdHC }
+    );
+    
+    if (response.data.code === "0" || response.data.msg === "Success") {
+      alert(`✅ Actualizado con éxito.`);
+      await this.verificarRegistroHC(this.docenteData.CIInfPer);
+      if (this.estaRegistrado) {
+        await this.ejecutarComparacion(this.docenteData.CIInfPer);
+      }
+    } else if (response.data.code === "128") {
+      alert("La foto no es compatible con HikCentral.");
+    }
+  } catch (error) {
+    this.estencontrado = false;
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+## Helper Methods
+
+### getPhotoUrl(ci)
+
+Gets SIAD photo URL:
+
+```javascript
+getPhotoUrl(ci) {
+  const baseURL2 = API.defaults.baseURL;
+  return `${baseURL2}/biometrico/fotografiadoc/${ci}?t=${new Date().getTime()}`;
+}
+```
+
+### getPhotoUrl2(ci)
+
+Gets HikCentral photo URL:
+
+```javascript
+getPhotoUrl2(ci) {
+  const baseURL2 = API.defaults.baseURL;
+  return `${baseURL2}/biometrico/gethick/${ci}?t=${new Date().getTime()}`;
+}
+```
+
+## Template Structure
+
+<Tabs>
+  <Tab title="Search Form">
+    ```vue
+    <form class="flex-grow">
+      <div class="relative">
+        <input 
+          type="text" 
+          placeholder="Ingresa la cédula a buscar..." 
+          v-model="searchQuery"
+          @input="debouncedFilter" 
+          @keypress="onlyNumbers" 
+          @keyup.enter="buscarDocente" />
+      </div>
+    </form>
+    ```
+  </Tab>
+  
+  <Tab title="Staff Type Display">
+    ```vue
+    <p v-if="docenteData.TipoInfPer === 'D'">Docente</p>
+    <p v-if="docenteData.TipoInfPer === 'A'">Administrativo</p>
+    <p v-if="docenteData.TipoInfPer === 'T'">Trabajador</p>
+    <p v-if="docenteData.TipoInfPer === 'TDO'">Tecnico Docente</p>
+    ```
+  </Tab>
+  
+  <Tab title="Photo Comparison">
+    ```vue
+    <div class="mb-4 flex justify-center">
+      <div class="relative">
+        <img :src="getPhotoUrl(docenteData.CIInfPer)" />
+        <span class="badge">SIAD</span>
+      </div>
+      <div class="relative">
+        <img :src="getPhotoUrl2(docenteData.CIInfPer)" loading="lazy" />
+        <span class="badge">HIKCENTRAL</span>
+      </div>
+    </div>
+    
+    <div v-if="comparacionResultado" class="mt-2">
+      <span>Similitud: {{ comparacionResultado.similitud }}%</span>
+      <span>{{ comparacionResultado.identicas ? 'Coincide' : 'No coincide' }}</span>
+    </div>
+    ```
+  </Tab>
+  
+  <Tab title="Action Buttons">
+    ```vue
+    <button 
+      v-if="!estaRegistrado && !cargandoStatus" 
+      @click="registrarEnHikCentral(docenteData.CIInfPer)">
+      Enviar Foto a HIK
+    </button>
+    
+    <button 
+      v-else-if="estaRegistrado && comparacionResultado && !comparacionResultado.identicas"
+      @click="UpdateEnHikCentral(docenteData.CIInfPer)">
+      Actualizar Foto en HIK (Baja Similitud)
+    </button>
+    
+    <div v-else-if="estaRegistrado && comparacionResultado && comparacionResultado.identicas">
+      Información Sincronizada y Validada
+    </div>
+    ```
+  </Tab>
+</Tabs>
+
+## API Endpoints Used
+
+- `GET /biometrico/getindivDoc/{ci}` - Get staff member info
+- `GET /biometrico/getperson/{ci}` - Check HikCentral registration
+- `GET /biometrico/compare-hikdoc/{ci}` - Compare photos
+- `POST /biometrico/sync-hikcentral/{ci}` - Register in HikCentral
+- `POST /biometrico/sync-hikdupdatedoce/{ci}` - Update in HikCentral
+- `GET /biometrico/fotografiadoc/{ci}` - Get SIAD photo
+- `GET /biometrico/gethick/{ci}` - Get HikCentral photo
+
+## Error Handling
+
+The component handles various HikCentral error codes:
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| `0` | Success | Display success message |
+| `131` | Already registered | Show warning, update status |
+| `128` | Photo incompatible | Alert user, clear form |

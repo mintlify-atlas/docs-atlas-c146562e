@@ -1,0 +1,383 @@
+---
+title: 'Teacher Registration'
+description: 'Manage teacher and staff photo registration for biometric access control integration'
+---
+
+## Overview
+
+The Teacher Registration feature manages biometric photo data for all institutional personnel including teachers, administrators, workers, and technical staff. This module synchronizes personnel data from SIAD to the HikCentral biometric system.
+
+## Personnel Types
+
+The system supports four personnel categories:
+
+<CardGroup cols={2}>
+  <Card title="Docente (D)" icon="chalkboard-user">
+    Teaching faculty members
+  </Card>
+  <Card title="Administrativo (A)" icon="user-tie">
+    Administrative staff
+  </Card>
+  <Card title="Trabajador (T)" icon="user-hard-hat">
+    General workers and support staff
+  </Card>
+  <Card title="Técnico Docente (TDO)" icon="user-gear">
+    Technical teaching staff
+  </Card>
+</CardGroup>
+
+## Individual Registration
+
+### Search and Register Personnel
+
+The individual workflow provides detailed verification and registration for single staff members.
+
+<Steps>
+  <Step title="Search by ID Number">
+    Enter the personnel ID number (cedula) in the search field:
+    - Minimum 10 digits required
+    - Numeric validation enforced
+    - Press Enter to search
+    
+    ```javascript
+    async buscarDocente() {
+      if (this.searchQuery.length < 10) return;
+      
+      const response = await API.get(`/biometrico/getindivDoc/${this.searchQuery}`);
+      this.docenteData = response.data;
+    }
+    ```
+  </Step>
+  
+  <Step title="Review Personnel Information">
+    System displays complete personnel profile:
+    - Full name (first name, paternal surname, maternal surname)
+    - ID number
+    - Personnel type (Docente, Administrativo, etc.)
+    - Institutional email
+    - Profile photo from SIAD
+  </Step>
+  
+  <Step title="Verify HikCentral Status">
+    Automatic verification checks:
+    - Registration status in HikCentral
+    - Retrieves PersonId if already registered
+    - Fetches current photo from biometric system
+    
+    ```javascript
+    async verificarRegistroHC(ci) {
+      const response = await API.get(`/biometrico/getperson/${ci}`);
+      this.personIdHC = response.data.personId;
+      this.estaRegistrado = response.data.registrado;
+    }
+    ```
+  </Step>
+  
+  <Step title="Compare Photos">
+    If registered, automatic facial comparison executes:
+    - Similarity percentage calculated
+    - Visual side-by-side comparison
+    - Match/no-match indicator
+  </Step>
+</Steps>
+
+### Photo Comparison Interface
+
+The system displays photos from both sources with clear labeling:
+
+```vue
+<div class="mb-4 flex justify-center">
+  <!-- SIAD Photo -->
+  <div class="relative">
+    <img :src="getPhotoUrl(docenteData.CIInfPer)"
+         class="h-32 w-48 rounded-xl object-cover" />
+    <span class="absolute -top-2 -right-2 bg-brand-500 text-white">SIAD</span>
+  </div>
+  
+  <!-- HikCentral Photo -->
+  <div class="relative">
+    <img :src="getPhotoUrl2(docenteData.CIInfPer)"
+         class="h-32 w-48 rounded-xl object-cover" />
+    <span class="absolute -top-2 -right-2 bg-red-500 text-white">HIKCENTRAL</span>
+  </div>
+</div>
+```
+
+### Registration Actions
+
+<Tabs>
+  <Tab title="New Registration">
+    **When personnel is NOT registered:**
+    
+    ```javascript
+    async registrarEnHikCentral(ci) {
+      const response = await API.post(`/biometrico/sync-hikcentral/${ci}`);
+      
+      if (response.data.code === "0") {
+        // Registration successful
+        await this.verificarRegistroHC(ci);
+        await this.ejecutarComparacion(ci);
+      }
+    }
+    ```
+    
+    Button displayed: **"Enviar Foto a HIK"**
+  </Tab>
+  
+  <Tab title="Update Photo">
+    **When similarity is low:**
+    
+    ```javascript
+    async UpdateEnHikCentral(ci) {
+      const response = await API.post(
+        `/biometrico/sync-hikdupdatedoce/${ci}`,
+        { personaId: this.personIdHC }
+      );
+    }
+    ```
+    
+    Button displayed: **"Actualizar Foto en HIK (Baja Similitud)"**
+    
+    <Warning>
+      PersonId from HikCentral is required for updates. The system retrieves this during verification.
+    </Warning>
+  </Tab>
+  
+  <Tab title="Validated">
+    **When photos match with high similarity:**
+    
+    Display message: "Información Sincronizada y Validada" with green checkmark.
+    
+    No action button shown - registration is complete and verified.
+  </Tab>
+</Tabs>
+
+### Facial Similarity Calculation
+
+The system automatically compares photos when personnel is registered:
+
+```javascript
+async ejecutarComparacion(ci) {
+  this.comparando = true;
+  const { data } = await API.get(`/biometrico/compare-hikdoc/${ci}`);
+  
+  this.comparacionResultado = data;
+  // data.identicas: boolean
+  // data.similitud: percentage (e.g., "95.5")
+}
+```
+
+<Card title="Similarity Thresholds" icon="scale-balanced">
+  - **High Match**: Green indicator - photos are identical
+  - **Low Match**: Red indicator - significant differences detected
+  - Similarity percentage shown (e.g., "Similitud: 87.3%")
+</Card>
+
+## Bulk Management
+
+### Personnel List View
+
+The bulk interface provides comprehensive filtering and mass operations.
+
+**Filter Controls:**
+
+```vue
+<!-- Personnel Type Filter -->
+<select v-model="selectedtipodoc" @change="debouncedFilter">
+  <option value="Todos">Todos</option>
+  <option value="D">Docente</option>
+  <option value="A">Administrativo</option>
+  <option value="T">Trabajador</option>
+  <option value="TDO">Tecnico Docente</option>
+</select>
+
+<!-- Search by ID or Name -->
+<input 
+  v-model="searchQuery"
+  @input="debouncedFilter"
+  @keypress="onlyNumbers"
+  placeholder="Ingresa la cédula o nombre a buscar..."
+/>
+```
+
+<Note>
+  Search input is debounced with 900ms delay to reduce server requests during typing.
+</Note>
+
+### Table Structure
+
+The personnel table displays:
+
+| Column | Content | Description |
+|--------|---------|-------------|
+| **Usuario** | Photo + Name + ID | Personnel identification |
+| **Tipo personal** | D/A/T/TDO label | Personnel category |
+| **Foto HIKCENTRAL** | Thumbnail | Current biometric photo |
+| **Registrado en HIKCENTRAL** | Status badge | Green (Yes) / Red (No) |
+| **Actions** | Update button | Individual photo update |
+
+### Status Verification
+
+The system verifies registration status for all displayed personnel:
+
+```javascript
+async verificarRegistrosMasivos() {
+  for (let post of items) {
+    if (this.cargando) break; // Stop if user navigates away
+    
+    const res = await API.get(`/biometrico/getperson/${post.CIInfPer}`);
+    post.estaRegistradoHC = res.data.registrado;
+    
+    await new Promise(resolve => setTimeout(resolve, 50)); // Rate limiting
+  }
+}
+```
+
+### Mass Synchronization
+
+Bulk synchronization processes unregistered personnel automatically.
+
+<Steps>
+  <Step title="Click Bulk Sync Button">
+    "Sincronizar Pendientes (Masivo)" button initiates the process
+  </Step>
+  
+  <Step title="Fetch Pending List">
+    ```javascript
+    const { data } = await API.get('/biometrico/get-pending-sync', {
+      params: { tipoFilter: selectedtipodoc }
+    });
+    this.pendientes = data.pendientes;
+    ```
+  </Step>
+  
+  <Step title="Sequential Processing">
+    Process each person one by one:
+    - Prevents server overload (429 errors)
+    - 300ms delay between requests
+    - Individual error handling per person
+    - Progress bar updates in real-time
+  </Step>
+</Steps>
+
+**Sync Progress Display:**
+
+```vue
+<div v-if="syncMode">
+  <span>Sincronizando con HikCentral: {{ syncIndex }} / {{ pendientes.length }}</span>
+  <span>{{ progressSync }}%</span>
+  <div class="progress-bar" :style="{ width: progressSync + '%' }"></div>
+  <p>Procesando: {{ currentSyncName }}</p>
+</div>
+```
+
+<Warning>
+  During bulk sync:
+  - All buttons are disabled
+  - Process cannot be interrupted
+  - Refresh occurs automatically after completion
+</Warning>
+
+### Individual Update from Table
+
+Each row has an "Actualizar foto" button that:
+
+```javascript
+abrirModalEdicion(user) {
+  this.objetoeditar = {
+    CIInfPer: user.CIInfPer,
+    nombre_us: user.NombInfPer + ' ' + user.ApellMatInfPer + ' ' + user.ApellInfPer,
+    mailPer: user.mailPer,
+    TipoInfPer: user.TipoInfPer
+  };
+  
+  this.isEditModalOpen = true;
+  this.verificarRegistroHC(user.CIInfPer);
+}
+```
+
+Opens a modal with:
+- Personnel details
+- Photo comparison
+- Registration/update buttons
+- Similarity calculation
+
+## Response Codes
+
+### Success and Error Handling
+
+<CardGroup cols={2}>
+  <Card title="Code 0 - Success" icon="check" color="#10b981">
+    Registration or update completed successfully
+  </Card>
+  <Card title="Code 128 - Invalid Photo" icon="image-slash" color="#ef4444">
+    Photo format not compatible with HikCentral requirements
+  </Card>
+  <Card title="Code 131 - Already Exists" icon="copy" color="#f59e0b">
+    Person already registered (should use update instead)
+  </Card>
+</CardGroup>
+
+### Error Recovery
+
+```javascript
+try {
+  const response = await API.post(`/biometrico/sync-hikcentral/${ci}`);
+  
+  if (response.data.code === "128") {
+    alert("La foto no es compatible con HikCentral.");
+    this.estaRegistrado = false;
+  } else if (response.data.code === "131") {
+    alert("Usuario ya registrado en HikCentral.");
+    this.estaRegistrado = true;
+  }
+} catch (error) {
+  console.error("Error al sincronizar:", error);
+  this.estencontrado = false;
+}
+```
+
+## Pagination and Navigation
+
+Server-side pagination with filter persistence:
+
+```javascript
+filterAndFetch() {
+  this.currentPage = 1; // Reset to first page
+  this.getAdministrativosD(
+    this.currentPage, 
+    this.searchQuery, 
+    this.selectedtipodoc
+  );
+}
+
+nextPage() {
+  if (this.currentPage < this.lastPage && !this.cargando) {
+    this.getAdministrativosD(
+      this.currentPage + 1,
+      this.searchQuery,
+      this.selectedtipodoc
+    );
+  }
+}
+```
+
+- Navigation buttons disabled during loading
+- Current page displayed: "Página X de Y"
+- Filters maintained across pages
+- Automatic verification on each page load
+
+## Best Practices
+
+<Card title="Recommended Workflow" icon="list-check">
+  1. **Filter by personnel type** for targeted management
+  2. **Search individual staff** for quick updates
+  3. **Review similarity scores** before updating photos
+  4. **Use bulk sync** for initial system setup or after photo updates
+  5. **Monitor progress** during mass operations
+  6. **Verify status** after bulk processes complete
+</Card>
+
+<Note>
+  Personnel photos are cached with timestamp parameters to ensure fresh images are displayed after updates.
+</Note>

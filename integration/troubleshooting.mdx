@@ -1,0 +1,593 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for the Biométrico system
+---
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Error 429: Too Many Requests">
+    ### Problem
+    
+    When performing bulk operations, you may encounter:
+    
+    ```javascript
+    Error: Request failed with status code 429
+    Too Many Requests
+    ```
+
+    ### Cause
+    
+    The server rate limits API requests to prevent overload. This commonly occurs when:
+    - Syncing multiple users simultaneously
+    - Making too many requests in a short time
+    - Bulk downloading photos without delays
+
+    ### Solution
+
+    **1. Sequential Processing**
+    
+    Process requests one at a time instead of in parallel:
+
+    ```javascript
+    // ❌ Bad: Parallel requests
+    const promises = users.map(user => syncUser(user));
+    await Promise.all(promises);
+
+    // ✅ Good: Sequential with delay
+    for (const user of users) {
+      await syncUser(user);
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    ```
+
+    **2. Add Delays Between Requests**
+
+    ```javascript
+    async iniciarSincronizacionMasiva() {
+      for (const p of this.pendientes) {
+        try {
+          const res = await API.post(`${this.baseUrl}/sync-hikdoc/${p.CIInfPer}`);
+          // Process response
+        } catch (e) {
+          console.error(`Error: ${e.message}`);
+        }
+
+        this.syncIndex++;
+        // ✅ 300ms delay prevents rate limiting
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+    ```
+
+    **3. Implement Retry Logic**
+
+    ```javascript
+    async function syncWithRetry(ci, maxRetries = 3) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          const response = await API.post(`/biometrico/sync-hikdoc/${ci}`);
+          return response.data;
+        } catch (error) {
+          if (error.response?.status === 429 && i < maxRetries - 1) {
+            const delay = Math.pow(2, i) * 1000; // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          throw error;
+        }
+      }
+    }
+    ```
+
+    ### Prevention
+
+    - Process users sequentially
+    - Add 300-500ms delay between requests
+    - Use progress indicators for long operations
+    - Implement exponential backoff for retries
+  </Accordion>
+
+  <Accordion title="Request Timeout Errors">
+    ### Problem
+
+    ```javascript
+    Error: timeout of 90000ms exceeded
+    ECONNABORTED
+    ```
+
+    ### Cause
+
+    Operations take longer than the configured timeout (90 seconds by default):
+    - Bulk photo downloads
+    - Large file uploads
+    - Slow network connection
+    - Server processing delays
+
+    ### Solution
+
+    **1. Increase Timeout for Specific Operations**
+
+    ```javascript
+    // Default timeout: 90 seconds
+    const API = axios.create({
+      baseURL: `${__API_BIOMETRICO__}`,
+      timeout: 90000,
+    });
+
+    // Override for bulk operations
+    async descargarDatosMasiva() {
+      try {
+        const response = await API.get('/biometrico/descargarfotosmasiva', {
+          timeout: 600000, // 10 minutes for bulk download
+        });
+        // Process response
+      } catch (error) {
+        if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+          alert("La conexión expiró. El proceso es muy pesado. Inténtelo de nuevo.");
+        }
+      }
+    }
+    ```
+
+    **2. Handle Timeout Errors Gracefully**
+
+    ```javascript
+    try {
+      const response = await API.get('/biometrico/estudiantesfoto');
+    } catch (error) {
+      if (error.code === 'ECONNABORTED') {
+        console.error('Request timeout');
+        // Retry or notify user
+      }
+    }
+    ```
+
+    **3. Break Large Operations into Chunks**
+
+    Instead of downloading all photos at once, paginate:
+
+    ```javascript
+    async function downloadPhotosPaginated() {
+      const pageSize = 50;
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await API.get('/biometrico/estudiantesfoto', {
+          params: { page: currentPage, per_page: pageSize }
+        });
+
+        // Process batch
+        await processBatch(response.data.data);
+
+        hasMore = currentPage < response.data.pagination.last_page;
+        currentPage++;
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Error 128: Photo Format Not Compatible">
+    ### Problem
+
+    ```json
+    {
+      "code": "128",
+      "msg": "Photo format not compatible with HikCentral"
+    }
+    ```
+
+    ### Cause
+
+    Photo doesn't meet HikCentral's format requirements:
+    - Invalid image format (not JPEG/PNG)
+    - Resolution too low
+    - File size too large
+    - Face not clearly visible
+    - Photo corrupted or damaged
+
+    ### Solution
+
+    **1. Validate Photo Format**
+
+    ```javascript
+    function validatePhotoFormat(file) {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      const maxSize = 2 * 1024 * 1024; // 2MB
+
+      if (!validTypes.includes(file.type)) {
+        throw new Error('Only JPEG and PNG formats are supported');
+      }
+
+      if (file.size > maxSize) {
+        throw new Error('Photo size must be less than 2MB');
+      }
+
+      return true;
+    }
+    ```
+
+    **2. Check Image Dimensions**
+
+    ```javascript
+    async function validateImageDimensions(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          if (img.width < 400 || img.height < 400) {
+            reject(new Error('Image must be at least 400x400 pixels'));
+          } else {
+            resolve(true);
+          }
+        };
+        img.onerror = () => reject(new Error('Invalid image file'));
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    ```
+
+    **3. Handle Error Code 128**
+
+    ```javascript
+    async function syncStudent(ci) {
+      try {
+        const res = await API.post(`/biometrico/sync-hikdoc/${ci}`);
+        
+        if (res.data.code === "128") {
+          console.warn(`Photo format issue for ${ci}`);
+          // Flag for manual review
+          await flagForReview(ci, 'Photo format incompatible');
+        }
+      } catch (error) {
+        console.error('Sync error:', error);
+      }
+    }
+    ```
+
+    ### Photo Requirements
+
+    | Requirement | Specification |
+    |------------|---------------|
+    | Format | JPEG or PNG |
+    | Min Resolution | 400x400 pixels |
+    | Max File Size | 2MB |
+    | Face | Front-facing, clearly visible |
+    | Background | Plain, contrasting |
+  </Accordion>
+
+  <Accordion title="Error 131: User Already Registered">
+    ### Problem
+
+    ```json
+    {
+      "code": "131",
+      "msg": "User already registered in HikCentral"
+    }
+    ```
+
+    ### Cause
+
+    The user already exists in HikCentral system.
+
+    ### Solution
+
+    **1. Check Before Syncing**
+
+    ```javascript
+    async function syncIfNotRegistered(ci) {
+      // First check registration status
+      const status = await API.get(`/biometrico/getperson-est/${ci}`);
+      
+      if (status.data.registrado) {
+        console.log(`User ${ci} already registered`);
+        return { alreadyRegistered: true };
+      }
+
+      // Proceed with sync
+      return await API.post(`/biometrico/sync-hikdoc/${ci}`);
+    }
+    ```
+
+    **2. Handle Gracefully in Bulk Operations**
+
+    ```javascript
+    for (const p of this.pendientes) {
+      try {
+        const res = await API.post(`${this.baseUrl}/sync-hikdoc/${p.CIInfPer}`);
+        
+        if (res.data.code === "0") {
+          console.log(`✅ Sincronizado: ${p.CIInfPer}`);
+        } else if (res.data.code === "131") {
+          console.warn(`⚠️ Ya registrado: ${p.CIInfPer}`);
+          // Continue to next user, this is not an error
+        }
+      } catch (e) {
+        console.error(`❌ Error: ${e.message}`);
+      }
+    }
+    ```
+
+    **3. Update Local Status**
+
+    ```javascript
+    if (response.data.code === "131") {
+      // Update UI to show as registered
+      user.estaRegistradoHC = true;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Error 401: Session Expired">
+    ### Problem
+
+    ```javascript
+    Error: Request failed with status code 401
+    Unauthorized
+    ```
+
+    ### Cause
+
+    Authentication token has expired or is invalid.
+
+    ### Solution
+
+    **Automatic Handling**
+
+    The response interceptor automatically handles 401 errors:
+
+    ```javascript
+    API.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          console.warn("🔒 Sesión expirada. Cerrando sesión...");
+          localStorage.removeItem("token_bio");
+          localStorage.removeItem("token_type_bio");
+          window.location.href = "/biometrico";
+        }
+        return Promise.reject(error);
+      }
+    );
+    ```
+
+    **Manual Token Refresh (if implemented)**
+
+    ```javascript
+    async function refreshToken() {
+      try {
+        const response = await axios.post('/api/refresh', {
+          refresh_token: localStorage.getItem('refresh_token')
+        });
+        
+        localStorage.setItem('token_bio', response.data.access_token);
+        return response.data.access_token;
+      } catch (error) {
+        // Refresh failed, redirect to login
+        window.location.href = '/biometrico';
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Photo Loading Issues">
+    ### Problem
+
+    Photos fail to load or display broken image icons.
+
+    ### Cause
+
+    - Photo doesn't exist for the user
+    - Network error
+    - Incorrect URL format
+    - Permission issues
+
+    ### Solution
+
+    **1. Implement Error Handling**
+
+    ```javascript
+    handleImageError(event) {
+      // Replace with default avatar
+      event.target.src = 
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/User_icon_2.svg/480px-User_icon_2.svg.png";
+    }
+    ```
+
+    **2. Use in Template**
+
+    ```vue
+    <img 
+      :src="getPhotoUrl(user.CIInfPer)" 
+      @error="handleImageError"
+      alt="User photo"
+    />
+    ```
+
+    **3. Add Cache Busting**
+
+    ```javascript
+    getPhotoUrl(ci) {
+      const baseURL = API.defaults.baseURL;
+      return `${baseURL}/biometrico/fotografia/${ci}?v=${this.refreshKey}`;
+    }
+    ```
+
+    **4. Check Photo Existence**
+
+    ```javascript
+    async function checkPhotoExists(ci) {
+      try {
+        const response = await API.head(`/biometrico/fotografia/${ci}`);
+        return response.status === 200;
+      } catch (error) {
+        return false;
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="CORS Errors">
+    ### Problem
+
+    ```
+    Access to XMLHttpRequest has been blocked by CORS policy
+    ```
+
+    ### Cause
+
+    Backend not configured to accept requests from frontend origin.
+
+    ### Solution
+
+    **1. Configure Backend CORS**
+
+    Ensure backend allows your frontend origin:
+
+    ```php
+    // Laravel example
+    'allowed_origins' => [
+        'http://localhost:8080',
+        'http://192.168.1.112',
+    ],
+    ```
+
+    **2. Development Proxy**
+
+    Use proxy in development (already configured):
+
+    ```javascript
+    // vue.config.js
+    devServer: {
+      proxy: {
+        '/api': {
+          target: 'http://biometricobackend.test',
+          changeOrigin: true,
+        },
+      },
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Code Reference
+
+| Code | Description | Action |
+|------|-------------|--------|
+| **0** | Success | Operation completed successfully |
+| **128** | Photo format incompatible | Check photo meets HikCentral requirements |
+| **131** | Already registered | User exists in HikCentral, skip or update |
+| **401** | Unauthorized | Token expired, redirect to login |
+| **429** | Too many requests | Reduce request rate, add delays |
+| **500** | Server error | Check server logs, contact support |
+
+## Debugging Tips
+
+### Enable Console Logging
+
+The application has built-in console logging:
+
+```javascript
+// Request errors
+console.error("❌ Error en la solicitud:", error);
+
+// Response errors
+console.warn("⚠️ Error en respuesta del servidor:", {
+  status: error.response.status,
+  data: error.response.data,
+  url: error.config.url,
+});
+```
+
+### Network Tab
+
+1. Open browser DevTools (F12)
+2. Go to Network tab
+3. Filter by XHR
+4. Check request/response details
+
+### Check Authentication
+
+```javascript
+// Verify tokens exist
+const token = localStorage.getItem("token_bio");
+const tokenType = localStorage.getItem("token_type_bio");
+
+if (!token || !tokenType) {
+  console.error("Missing authentication tokens");
+}
+```
+
+### Test API Endpoints
+
+Use browser console or tools like Postman:
+
+```javascript
+// Test in browser console
+await API.get('/biometrico/estudiantesfoto?page=1')
+  .then(res => console.log(res.data))
+  .catch(err => console.error(err));
+```
+
+## Performance Optimization
+
+### Pagination
+
+Always use pagination for large datasets:
+
+```javascript
+const params = {
+  page: 1,
+  per_page: 50, // Reasonable page size
+};
+
+const response = await API.get('/biometrico/estudiantesfoto', { params });
+```
+
+### Debouncing Search
+
+Prevent excessive API calls on search:
+
+```javascript
+import debounce from 'lodash.debounce';
+
+created() {
+  this.debouncedFilter = debounce(() => {
+    this.filterAndFetch();
+  }, 900); // Wait 900ms after user stops typing
+}
+```
+
+### Cache Photo URLs
+
+```javascript
+data() {
+  return {
+    photoCache: {},
+    refreshKey: Date.now(),
+  };
+},
+
+getPhotoUrl(ci) {
+  if (this.photoCache[ci]) {
+    return this.photoCache[ci];
+  }
+  
+  const url = `${API.defaults.baseURL}/biometrico/fotografia/${ci}?v=${this.refreshKey}`;
+  this.photoCache[ci] = url;
+  return url;
+}
+```
+
+## Getting Help
+
+If you encounter issues not covered here:
+
+1. Check the [API Configuration](/integration/api-configuration) documentation
+2. Review [HikCentral Integration](/integration/hikcentral) setup
+3. Check server logs for backend errors
+4. Contact system administrator with:
+   - Error message
+   - Steps to reproduce
+   - Network tab screenshot
+   - Console error logs

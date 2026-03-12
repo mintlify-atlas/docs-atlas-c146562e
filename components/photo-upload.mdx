@@ -1,0 +1,367 @@
+---
+title: Photo Upload Components
+description: Student and teacher photo management components with bulk operations
+---
+
+## Overview
+
+The photo upload components manage photo synchronization between SIAD and HikCentral systems, supporting both individual and bulk operations.
+
+## Component Locations
+
+```
+src/components/fotos/estudiantes_foto.vue
+src/components/fotos/docentes_foto.vue
+```
+
+## Student Photo Component
+
+### Features
+
+- Student photo listing with pagination
+- Filter by career/program
+- Search by ID or name
+- HikCentral registration status
+- Bulk synchronization
+- Photo comparison
+- ZIP download of all photos
+
+### Usage
+
+```vue
+<template>
+  <estudiantes_foto />
+</template>
+
+<script setup>
+import estudiantes_foto from '@/components/fotos/estudiantes_foto.vue'
+</script>
+```
+
+### Data Properties
+
+```javascript
+data() {
+  return {
+    baseUrl: "/biometrico",
+    filteredpostulaciones: [],
+    searchQuery: "",
+    selectedCarrera: 'Todos',
+    carrerasList: [],
+    totalEstudiantes: 0,
+    currentPage: 1,
+    lastPage: 1,
+    cargando: false,
+    estaRegistrado: false,
+    syncMode: false,
+    pendientes: [],
+    syncIndex: 0,
+    currentSyncName: '',
+  }
+}
+```
+
+### Key Methods
+
+#### getAdministrativosD()
+
+Fetches students with pagination and filtering:
+
+```javascript
+async getAdministrativosD(page = 1, searchQuery = "", carreraName = "Todos") {
+  this.cargando = true;
+  try {
+    const params = {
+      page: page,
+      search_query: searchQuery,
+      carrera_name: carreraName === 'Todos' ? '' : carreraName,
+    };
+    
+    const response = await API.get(`${this.baseUrl}/estudiantesfoto`, {
+      params
+    });
+    
+    const data = response.data?.data || [];
+    const pagination = response.data?.pagination || {};
+    
+    this.currentPage = pagination.current_page || 1;
+    this.lastPage = pagination.last_page || 1;
+    this.totalEstudiantes = response.data.pagination.total;
+    this.filteredpostulaciones = data;
+    
+    await this.verificarRegistrosMasivos();
+  } catch (error) {
+    console.warn("⚠️ Error al obtener datos:", error);
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+#### iniciarSincronizacionMasiva()
+
+Bulk synchronization to HikCentral:
+
+```javascript
+async iniciarSincronizacionMasiva() {
+  if (!confirm("Se buscarán usuarios no registrados. ¿Continuar?")) return;
+  
+  this.syncMode = true;
+  this.syncIndex = 0;
+  
+  try {
+    const { data } = await API.get(`${this.baseUrl}/get-pending-sync-est`, {
+      params: { carrera_name: this.selectedCarrera }
+    });
+    
+    this.pendientes = data.pendientes;
+    
+    if (this.pendientes.length === 0) {
+      alert("No se encontraron usuarios pendientes de registro.");
+      this.syncMode = false;
+      return;
+    }
+    
+    for (const p of this.pendientes) {
+      this.currentSyncName = p.NombInfPer;
+      
+      try {
+        const res = await API.post(`${this.baseUrl}/sync-hikdoc/${p.CIInfPer}`);
+        
+        if (res.data.code === "0" || res.data.msg === "Success") {
+          console.log(`✅ Sincronizado: ${p.CIInfPer}`);
+        }
+      } catch (e) {
+        console.error(`❌ Error en CI ${p.CIInfPer}:`, e.response?.data);
+      }
+      
+      this.syncIndex++;
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    alert("Sincronización masiva finalizada.");
+    this.getAdministrativosD(this.currentPage, this.searchQuery, this.selectedCarrera);
+  } catch (error) {
+    alert("Error al obtener la lista de pendientes.");
+  } finally {
+    this.syncMode = false;
+  }
+}
+```
+
+#### descargarDatosMasiva()
+
+Downloads all photos as ZIP:
+
+```javascript
+async descargarDatosMasiva() {
+  this.cargando = true;
+  try {
+    const zip = new JSZip();
+    
+    const response = await API.get(`${this.baseUrl}/descargarfotosmasiva`, {
+      timeout: 600000, // 10 minutes
+    });
+    
+    const registros = response.data?.data || [];
+    
+    for (const post of registros) {
+      const fotoBinariaBase64 = post.fotografia;
+      const byteCharacters = atob(fotoBinariaBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      const carreraNombre = post.NombCarr?.replace(/[\\/:*?"<>|]/g, "_") || "Sin_Carrera";
+      const folder = zip.folder(carreraNombre);
+      
+      const nombre = (post.NombInfPer || "sinNombre").replace(/\s+/g, " ").trim();
+      const apellido = (post.ApellInfPer || "sinApellido1").replace(/\s+/g, " ").trim();
+      const apellido2 = (post.ApellMatInfPer || "sinApellido2").replace(/\s+/g, " ").trim();
+      const cedula = post.CIInfPer || "sinCedula";
+      const fileName = `${nombre}_${apellido}_${apellido2}_${cedula}.jpg`;
+      
+      folder.file(fileName, byteArray, { binary: true });
+    }
+    
+    const content = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 9 },
+    });
+    
+    saveAs(content, "Estudiantes_con_Foto_por_Carrera.zip");
+    alert("Descarga completada con éxito!");
+  } catch (error) {
+    console.error("❌ Error al generar ZIP:", error);
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+## Teacher Photo Component
+
+### Features
+
+- Staff photo listing with pagination
+- Filter by staff type (Docente, Administrativo, etc.)
+- Search by ID or name
+- HikCentral registration status
+- Bulk synchronization
+- Photo comparison in modal
+- ZIP download of all photos
+
+### Usage
+
+```vue
+<template>
+  <docentes_foto />
+</template>
+
+<script setup>
+import docentes_foto from '@/components/fotos/docentes_foto.vue'
+</script>
+```
+
+### Data Properties
+
+```javascript
+data() {
+  return {
+    baseUrl: "/biometrico",
+    filteredpostulaciones: [],
+    searchQuery: "",
+    selectedtipodoc: 'Todos',
+    tipodocList: [
+      { label: "Todos", value: "Todos" },
+      { label: "Docente", value: "D" },
+      { label: "Administrativo", value: "A" },
+      { label: "Trabajador", value: "T" },
+      { label: "Tecnico Docente", value: "TDO" }
+    ],
+    totalEstudiantes: 0,
+    isEditModalOpen: false,
+    objetoeditar: {},
+  }
+}
+```
+
+### Modal Integration
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import Modal from '@/components/Modal/Modal.vue'
+
+const isEditModalOpen = ref(false)
+
+defineExpose({
+  isEditModalOpen
+})
+</script>
+```
+
+## Template Examples
+
+<Tabs>
+  <Tab title="Search & Filter">
+    ```vue
+    <div class="flex flex-col gap-4 md:flex-row mb-6">
+      <!-- Search -->
+      <form class="flex-grow">
+        <input 
+          type="text" 
+          placeholder="Ingresa la cédula o nombre a buscar..." 
+          v-model="searchQuery"
+          @input="debouncedFilter" />
+      </form>
+      
+      <!-- Filter -->
+      <select v-model="selectedCarrera" @change="debouncedFilter">
+        <option value="Todos">Todas las Carreras</option>
+        <option v-for="carrera in carrerasList" :value="carrera.id">
+          {{ carrera.nombre }}
+        </option>
+      </select>
+    </div>
+    ```
+  </Tab>
+  
+  <Tab title="Sync Progress">
+    ```vue
+    <div v-if="syncMode" class="mb-4 p-4 border rounded-xl">
+      <div class="flex justify-between mb-2">
+        <span>Sincronizando: {{ syncIndex }} / {{ pendientes.length }}</span>
+        <span>{{ progressSync }}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2.5">
+        <div class="bg-brand-500 h-2.5 rounded-full" 
+             :style="{ width: progressSync + '%' }">
+        </div>
+      </div>
+      <p class="text-xs mt-2">Procesando: {{ currentSyncName }}</p>
+    </div>
+    ```
+  </Tab>
+  
+  <Tab title="Data Table">
+    ```vue
+    <table class="min-w-full">
+      <thead>
+        <tr>
+          <th>Estudiante</th>
+          <th>Carrera</th>
+          <th>Foto HIKCENTRAL</th>
+          <th>Registrado en HIKCENTRAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="post in filteredpostulaciones" :key="post.CIInfPer">
+          <td>
+            <img :src="getPhotoUrl(post.CIInfPer)" />
+            <span>{{ post.NombInfPer }}</span>
+          </td>
+          <td>{{ post.NombCarr }}</td>
+          <td>
+            <img :src="getPhotoUrl2(post.CIInfPer)" />
+          </td>
+          <td>
+            <span v-if="post.estaRegistradoHC" class="badge-success">Sí</span>
+            <span v-else class="badge-error">No</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    ```
+  </Tab>
+</Tabs>
+
+## Computed Properties
+
+```javascript
+computed: {
+  progressSync() {
+    return this.pendientes.length > 0
+      ? Math.round((this.syncIndex / this.pendientes.length) * 100)
+      : 0;
+  }
+}
+```
+
+## API Endpoints
+
+### Student Photos
+- `GET /biometrico/estudiantesfoto` - Get students with photos
+- `GET /biometrico/get-pending-sync-est` - Get unregistered students
+- `POST /biometrico/sync-hikdoc/{ci}` - Sync student to HikCentral
+- `GET /biometrico/descargarfotosmasiva` - Download all photos
+
+### Teacher Photos
+- `GET /biometrico/getdocentes` - Get staff with photos
+- `GET /biometrico/get-pending-sync` - Get unregistered staff
+- `POST /biometrico/sync-hikcentral/{ci}` - Sync staff to HikCentral
+- `GET /biometrico/descargarfotosmasivadoc` - Download all staff photos

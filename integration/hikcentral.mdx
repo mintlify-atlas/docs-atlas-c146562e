@@ -1,0 +1,278 @@
+---
+title: HikCentral Integration
+description: Setup and configure HikCentral biometric integration
+---
+
+## Overview
+
+The Biométrico system integrates with HikCentral to synchronize student and staff photos for biometric access control. This integration allows automatic registration of users with their photos in the HikCentral access control system.
+
+## Architecture
+
+The integration follows this workflow:
+
+1. **Photo Collection**: Photos are captured and stored in the SIAD system
+2. **Synchronization**: Photos are synced to HikCentral via API endpoints
+3. **Verification**: The system validates registration status in HikCentral
+4. **Comparison**: Optional photo comparison to verify data integrity
+
+## Sync Endpoints
+
+### Individual Sync
+
+```javascript
+// Sync a single user to HikCentral
+POST /biometrico/sync-hikdoc/{ci}
+```
+
+**Parameters:**
+- `ci` - Cédula (ID number) of the person to sync
+
+**Response:**
+```json
+{
+  "code": "0",
+  "msg": "Success",
+  "data": "hikcentral_user_id"
+}
+```
+
+**Response Codes:**
+- `0` - Success
+- `128` - Photo format not compatible with HikCentral
+- `131` - User already registered in HikCentral
+
+### Bulk Sync
+
+```javascript
+// Get list of pending users
+GET /biometrico/get-pending-sync-est?carrera_name=CareerName
+
+// Response
+{
+  "pendientes": [
+    {
+      "CIInfPer": "1234567890",
+      "NombInfPer": "John",
+      "ApellInfPer": "Doe",
+      "ApellMatInfPer": "Smith"
+    }
+  ]
+}
+```
+
+### Implementation Example
+
+Here's how the bulk synchronization is implemented:
+
+```javascript
+async iniciarSincronizacionMasiva() {
+  if (!confirm("Se buscarán usuarios no registrados y se enviarán a HikCentral. ¿Continuar?")) return;
+
+  this.syncMode = true;
+  this.syncIndex = 0;
+
+  try {
+    // 1. Get list of pending users
+    const { data } = await API.get(`${this.baseUrl}/get-pending-sync-est`, {
+      params: { carrera_name: this.selectedCarrera }
+    });
+
+    this.pendientes = data.pendientes;
+    
+    if (this.pendientes.length === 0) {
+      alert("No se encontraron usuarios pendientes de registro.");
+      this.syncMode = false;
+      return;
+    }
+
+    // 2. Process one by one to avoid rate limits and timeouts
+    for (const p of this.pendientes) {
+      this.currentSyncName = p.NombInfPer;
+
+      try {
+        const res = await API.post(`${this.baseUrl}/sync-hikdoc/${p.CIInfPer}`);
+
+        if (res.data.code === "0" || res.data.msg === "Success") {
+          console.log(`✅ Sincronizado: ${p.CIInfPer}`);
+        } else if(res.data.code === "131") {
+          console.warn(`⚠️ Ya registrado: ${p.CIInfPer}`);
+        } else if(res.data.code === "128") {
+          console.warn(`La foto de: ${p.CIInfPer} no es compatible con HikCentral.`);
+        }
+      } catch (e) {
+        console.error(`❌ Error en CI ${p.CIInfPer}:`, e.response?.data || e.message);
+      }
+
+      this.syncIndex++;
+      // Delay to prevent server overload
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    alert("Sincronización masiva finalizada.");
+    this.getAdministrativosD(this.currentPage, this.searchQuery, this.selectedCarrera);
+
+  } catch (error) {
+    alert("Error al obtener la lista de pendientes.");
+  } finally {
+    this.syncMode = false;
+  }
+}
+```
+
+## Verification
+
+### Check Registration Status
+
+```javascript
+GET /biometrico/getperson-est/{ci}
+
+// Response
+{
+  "registrado": true
+}
+```
+
+### Photo Comparison
+
+```javascript
+GET /biometrico/compare-hikdoc-est/{ci}
+
+// Response
+{
+  "identicas": true,
+  "similitud": "95.5%"
+}
+```
+
+**Implementation:**
+
+```javascript
+async ejecutarComparacion() {
+  this.comparando = true;
+  try {
+    const ci = this.objetoeditar.CIInfPer;
+    const { data } = await API.get(`${this.baseUrl}/compare-hikdoc-est/${ci}?v=${this.refreshKey}`);
+
+    if (data.identicas) {
+      alert(`✅ Match: ${data.similitud} de similitud.`);
+    } else {
+      alert(`❌ Diferentes: Solo ${data.similitud} de parecido.`);
+    }
+  } catch (error) {
+    alert("Error en la comparación");
+  } finally {
+    this.comparando = false;
+  }
+}
+```
+
+## Photo Handling
+
+### Photo URLs
+
+Photos are accessed via these endpoints:
+
+```javascript
+// SIAD photo
+GET /biometrico/fotografia/{ci}
+
+// HikCentral photo
+GET /biometrico/gethick/{ci}
+```
+
+### Photo Format Requirements
+
+<Warning>
+Photos must meet HikCentral's format requirements. Error code `128` indicates incompatible photo format.
+</Warning>
+
+Common requirements:
+- Format: JPEG or PNG
+- Minimum resolution: 400x400 pixels
+- Maximum file size: 2MB
+- Face must be clearly visible and front-facing
+
+## Best Practices
+
+### Rate Limiting
+
+To avoid `429 Too Many Requests` errors:
+
+1. **Process sequentially**: Sync users one at a time
+2. **Add delays**: Use 300ms delay between requests
+3. **Monitor progress**: Track sync index and display progress
+
+```javascript
+for (const user of pendingUsers) {
+  await syncUser(user);
+  await new Promise(resolve => setTimeout(resolve, 300));
+}
+```
+
+### Error Handling
+
+Implement proper error handling for all sync operations:
+
+```javascript
+try {
+  const res = await API.post(`${this.baseUrl}/sync-hikdoc/${ci}`);
+  
+  if (res.data.code === "0") {
+    // Success
+  } else if (res.data.code === "131") {
+    // Already registered
+  } else if (res.data.code === "128") {
+    // Photo format issue
+  }
+} catch (e) {
+  console.error(`Error syncing ${ci}:`, e.response?.data || e.message);
+}
+```
+
+### Progress Tracking
+
+Show sync progress to users:
+
+```javascript
+computed: {
+  progressSync() {
+    return this.pendientes.length > 0
+      ? Math.round((this.syncIndex / this.pendientes.length) * 100)
+      : 0;
+  }
+}
+```
+
+## UI Components
+
+### Progress Bar
+
+```vue
+<div class="mb-4 p-4 border rounded-xl bg-gray-50 dark:bg-gray-800" v-if="syncMode">
+  <div class="flex justify-between mb-2">
+    <span class="text-sm font-medium">Sincronizando con HikCentral: {{ syncIndex }} / {{ pendientes.length }}</span>
+    <span class="text-sm font-bold">{{ progressSync }}%</span>
+  </div>
+  <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+    <div class="bg-brand-500 h-2.5 rounded-full transition-all duration-300" :style="{ width: progressSync + '%' }">
+    </div>
+  </div>
+  <p class="text-xs mt-2 text-gray-500 italic">Procesando: {{ currentSyncName }}</p>
+</div>
+```
+
+### Sync Button
+
+```vue
+<button @click="iniciarSincronizacionMasiva" 
+        :disabled="cargando || syncMode"
+        class="btn btn-primary bg-blue-600 text-white px-4 py-2 rounded-lg">
+  Sincronizar Pendientes (Masivo)
+</button>
+```
+
+## Next Steps
+
+- Configure [API settings](/integration/api-configuration)
+- Review [troubleshooting guide](/integration/troubleshooting)

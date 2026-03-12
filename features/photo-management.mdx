@@ -1,0 +1,483 @@
+---
+title: 'Photo Upload and Management'
+description: 'Comprehensive photo management system for SIAD and HikCentral synchronization'
+---
+
+## Overview
+
+The Photo Management system handles all aspects of photo storage, retrieval, comparison, and synchronization between the SIAD academic system and HikCentral biometric platform. This module ensures photo compatibility and maintains data integrity across both systems.
+
+## Photo Sources
+
+The system manages photos from two distinct sources:
+
+<CardGroup cols={2}>
+  <Card title="SIAD System" icon="database" color="#3b82f6">
+    Academic information system photos stored in SQL Server database as binary data (varbinary)
+  </Card>
+  <Card title="HikCentral" icon="camera" color="#ef4444">
+    Biometric system photos accessed via Artemis API with base64 encoding
+  </Card>
+</CardGroup>
+
+## Photo Retrieval
+
+### SIAD Photo Endpoints
+
+Photos are retrieved directly from the database with proper caching:
+
+**Student Photos:**
+
+```javascript
+// Frontend request
+getPhotoUrl(ci) {
+  const baseURL = API.defaults.baseURL;
+  return `${baseURL}/biometrico/fotografia/${ci}?t=${new Date().getTime()}`;
+}
+```
+
+**Teacher/Staff Photos:**
+
+```javascript
+getPhotoUrl(ci) {
+  const baseURL = API.defaults.baseURL;
+  return `${baseURL}/biometrico/fotografiadoc/${ci}?t=${new Date().getTime()}`;
+}
+```
+
+<Note>
+  The timestamp parameter (`?t=`) prevents browser caching and ensures the latest photo is always displayed after updates.
+</Note>
+
+### HikCentral Photo Endpoint
+
+Photos from the biometric system are fetched via API:
+
+```javascript
+getPhotoUrl2(ci) {
+  const baseURL = API.defaults.baseURL;
+  return `${baseURL}/biometrico/gethick/${ci}?t=${new Date().getTime()}`;
+}
+```
+
+**Backend Process:**
+
+1. Search person by ID in HikCentral
+2. Retrieve PersonId (UUID)
+3. Fetch face photo via Artemis API
+4. Return image with proper headers
+
+## Photo Comparison
+
+### Facial Similarity Detection
+
+The system uses backend image comparison to validate synchronization:
+
+<Steps>
+  <Step title="Retrieve Both Photos">
+    Fetch photo from SIAD database and HikCentral API
+  </Step>
+  
+  <Step title="Compare Images">
+    Backend processing calculates similarity:
+    
+    ```javascript
+    // Frontend request
+    const { data } = await API.get(`/biometrico/compare-hikdoc/${cedula}`);
+    
+    // Response structure
+    {
+      "identicas": true/false,
+      "similitud": "95.5"  // Percentage
+    }
+    ```
+  </Step>
+  
+  <Step title="Display Results">
+    Show similarity percentage and match status to user
+  </Step>
+</Steps>
+
+### Comparison Endpoints
+
+**For Students:**
+
+```javascript
+async ejecutarComparacion(ci) {
+  this.comparando = true;
+  try {
+    const { data } = await API.get(`/biometrico/compare-hikdoc-est/${ci}`);
+    this.comparacionResultado = data;
+    
+    if (data.identicas) {
+      console.log(`✅ Match: ${data.similitud}%`);
+    } else {
+      console.log(`❌ Different: ${data.similitud}% similarity`);
+    }
+  } finally {
+    this.comparando = false;
+  }
+}
+```
+
+**For Teachers/Staff:**
+
+```javascript
+const { data } = await API.get(`/biometrico/compare-hikdoc/${ci}`);
+```
+
+### Visual Comparison Interface
+
+Side-by-side photo display with clear source labeling:
+
+```vue
+<div class="mb-4 flex justify-center">
+  <!-- SIAD Photo -->
+  <div class="relative">
+    <img :src="getPhotoUrl(cedula)"
+         class="h-32 w-48 rounded-xl object-cover border-2" />
+    <span class="absolute -top-2 -right-2 bg-brand-500 text-white 
+                 text-[10px] px-2 py-1 rounded-full font-bold uppercase">SIAD</span>
+  </div>
+  
+  <!-- HikCentral Photo -->
+  <div class="relative">
+    <img :src="getPhotoUrl2(cedula)"
+         class="h-32 w-48 rounded-xl object-cover border-2" />
+    <span class="absolute -top-2 -right-2 bg-red-500 text-white 
+                 text-[10px] px-2 py-1 rounded-full uppercase">HIKCENTRAL</span>
+  </div>
+</div>
+```
+
+### Similarity Results Display
+
+<Tabs>
+  <Tab title="High Similarity">
+    ```vue
+    <span class="text-green-600 text-sm font-bold">
+      Similitud: {{ comparacionResultado.similitud }}%
+      (Coincide)
+    </span>
+    ```
+    
+    <Card title="Validated" icon="check-circle" color="#10b981">
+      Photos match - synchronization successful
+    </Card>
+  </Tab>
+  
+  <Tab title="Low Similarity">
+    ```vue
+    <span class="text-red-600 text-sm font-bold">
+      Similitud: {{ comparacionResultado.similitud }}%
+      (No coincide)
+    </span>
+    ```
+    
+    <Card title="Update Required" icon="triangle-exclamation" color="#ef4444">
+      Photos don't match - consider updating HikCentral photo
+    </Card>
+  </Tab>
+  
+  <Tab title="Processing">
+    ```vue
+    <div v-if="comparando" class="text-xs text-blue-500 animate-pulse">
+      Calculando similitud facial...
+    </div>
+    ```
+    
+    Loading indicator shown during comparison process
+  </Tab>
+</Tabs>
+
+## Bulk Photo Operations
+
+### Mass Download (ZIP Export)
+
+Download all student/staff photos organized by academic program or personnel type:
+
+```javascript
+async descargarDatosMasiva() {
+  this.cargando = true;
+  const zip = new JSZip();
+  
+  // Single request for all photos
+  const response = await API.get('/biometrico/descargarfotosmasiva', {
+    timeout: 600000 // 10 minutes
+  });
+  
+  const registros = response.data?.data || [];
+  
+  for (const post of registros) {
+    // Decode base64 photo
+    const byteCharacters = atob(post.fotografia);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    
+    // Organize by academic program
+    const carreraNombre = post.NombCarr
+      ? post.NombCarr.replace(/[\\/:*?"<>|]/g, "_").trim()
+      : "Sin_Carrera";
+    const folder = zip.folder(carreraNombre);
+    
+    // Create filename
+    const nombre = post.NombInfPer.replace(/\s+/g, " ").trim();
+    const apellido = post.ApellInfPer.replace(/\s+/g, " ").trim();
+    const apellido2 = post.ApellMatInfPer.replace(/\s+/g, " ").trim();
+    const fileName = `${nombre}_${apellido}_${apellido2}_${post.CIInfPer}.jpg`;
+    
+    folder.file(fileName, byteArray, { binary: true });
+  }
+  
+  // Generate and download ZIP
+  const content = await zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 9 }
+  });
+  
+  saveAs(content, "Estudiantes_con_Foto_por_Carrera.zip");
+}
+```
+
+<Warning>
+  Mass download operations can take several minutes depending on the number of photos. The timeout is set to 10 minutes to accommodate large datasets.
+</Warning>
+
+### ZIP Structure
+
+**For Students:**
+
+```
+Estudiantes_con_Foto_por_Carrera.zip
+├── Ingeniería en Sistemas/
+│   ├── Juan_Perez_Garcia_1234567890.jpg
+│   └── Maria_Lopez_Torres_0987654321.jpg
+├── Administración de Empresas/
+│   └── Carlos_Ruiz_Mendez_1122334455.jpg
+└── Sin_Carrera/
+    └── Ana_Gomez_Vera_5544332211.jpg
+```
+
+**For Teachers/Staff:**
+
+```
+Docentes_con_Foto.zip
+├── Docente/
+│   └── Pedro_Martinez_Silva_1111111111.jpg
+├── Administrativo/
+│   └── Lucia_Fernandez_Ramos_2222222222.jpg
+└── Trabajador/
+    └── Jose_Hernandez_Cruz_3333333333.jpg
+```
+
+## Photo Upload to HikCentral
+
+### Upload Process
+
+Photos are sent to HikCentral via the Artemis API:
+
+<Steps>
+  <Step title="Retrieve SIAD Photo">
+    Fetch binary photo from SQL Server database
+  </Step>
+  
+  <Step title="Convert to Base64">
+    Encode photo to base64 format required by API
+  </Step>
+  
+  <Step title="Prepare Person Data">
+    Create person object with:
+    - Name
+    - ID number
+    - Email
+    - Organization ID
+    - Photo data
+  </Step>
+  
+  <Step title="Send to HikCentral">
+    POST request to Artemis API with digital signature
+  </Step>
+  
+  <Step title="Store PersonId">
+    Save returned UUID for future updates
+  </Step>
+</Steps>
+
+### Student Upload
+
+```javascript
+// Initial registration
+const response = await API.post(
+  `/biometrico/sync-hikdoc-est-id/${cedula}`,
+  {},
+  { params: { idper: periodoSeleccionado } }
+);
+
+if (response.data.code === "0") {
+  alert(`✅ Registrado con éxito. ID: ${response.data.data}`);
+}
+```
+
+### Update Existing Photo
+
+```javascript
+// Update requires PersonId from HikCentral
+const response = await API.post(
+  `/biometrico/sync-hikdoc-update/${cedula}`,
+  { personaId: personIdHC },
+  { params: { idper: periodoSeleccionado } }
+);
+```
+
+<Note>
+  Updates require the PersonId (UUID) from HikCentral, which is retrieved during the verification step.
+</Note>
+
+## Photo Validation
+
+### Compatibility Requirements
+
+Photos must meet HikCentral standards:
+
+<CardGroup cols={2}>
+  <Card title="Format" icon="file-image">
+    JPEG or PNG format
+  </Card>
+  <Card title="Resolution" icon="maximize">
+    Minimum dimensions for facial recognition
+  </Card>
+  <Card title="Quality" icon="circle-check">
+    Clear, frontal face visible
+  </Card>
+  <Card title="Background" icon="image">
+    Plain background recommended
+  </Card>
+</CardGroup>
+
+### Validation Response
+
+```javascript
+if (response.data.code === "128") {
+  console.warn(`La foto de ${cedula} no es compatible con HikCentral.`);
+  alert("La foto no es compatible con HikCentral.");
+  this.estaRegistrado = false;
+}
+```
+
+**Code 128** indicates photo rejection due to:
+- Poor quality
+- Face not detected
+- Incorrect format
+- Resolution too low
+
+## Error Handling
+
+### Image Loading Errors
+
+```javascript
+handleImageError(event) {
+  // Fallback to default user icon
+  event.target.src = 
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/User_icon_2.svg/480px-User_icon_2.svg.png";
+}
+```
+
+Applied to all photo `<img>` tags:
+
+```vue
+<img :src="getPhotoUrl(cedula)" @error="handleImageError" />
+```
+
+### Timeout Handling
+
+```javascript
+try {
+  const response = await API.get('/biometrico/descargarfotosmasiva', {
+    timeout: 600000
+  });
+} catch (error) {
+  if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+    alert("La conexión expiró. El proceso es muy pesado. Inténtelo de nuevo.");
+  }
+}
+```
+
+## Cache Management
+
+### Frontend Cache Busting
+
+Timestamp parameters prevent stale images:
+
+```javascript
+getPhotoUrl(ci) {
+  const timestamp = new Date().getTime();
+  return `${baseURL}/biometrico/fotografia/${ci}?t=${timestamp}`;
+}
+
+// Alternative using refreshKey
+data() {
+  return {
+    refreshKey: Date.now()
+  }
+}
+
+getPhotoUrl(ci) {
+  return `${baseURL}/biometrico/fotografia/${ci}?v=${this.refreshKey}`;
+}
+```
+
+### Force Cache Refresh
+
+Manual cache clearing for specific users:
+
+```javascript
+async forzarRefrescoFoto(ci) {
+  this.cargandoStatus = true;
+  
+  // Update refresh key
+  this.refreshKey = Date.now();
+  
+  // Optional: Backend cache clear endpoint
+  await API.get(`/biometrico/clear-cache/${ci}`);
+  
+  // Re-verify registration
+  await this.verificarRegistroHC(ci);
+}
+```
+
+## Best Practices
+
+<Card title="Photo Management Guidelines" icon="book">
+  1. **Always validate photos** before bulk uploads
+  2. **Use timestamp parameters** to prevent cache issues
+  3. **Monitor similarity scores** after synchronization
+  4. **Handle errors gracefully** with fallback images
+  5. **Implement timeouts** for large batch operations
+  6. **Organize exports** by program/department for easier management
+  7. **Verify photo quality** meets HikCentral requirements before upload
+  8. **Cache PersonId values** to enable updates without re-registration
+</Card>
+
+## Performance Considerations
+
+<Warning>
+  **Rate Limiting**: Bulk operations include 50-300ms delays between requests to prevent server overload and 429 (Too Many Requests) errors.
+</Warning>
+
+```javascript
+// Example rate limiting in bulk verification
+for (let post of items) {
+  const res = await API.get(`/biometrico/getperson/${post.CIInfPer}`);
+  post.estaRegistradoHC = res.data.registrado;
+  
+  await new Promise(resolve => setTimeout(resolve, 50));
+}
+```
+
+<Note>
+  Photo retrieval from SIAD is optimized with database indexing on the ID field (CIInfPer) for fast lookups.
+</Note>

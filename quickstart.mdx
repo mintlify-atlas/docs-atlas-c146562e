@@ -1,80 +1,344 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart Guide
+description: Get started with Biométrico by completing your first student registration
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
+This guide walks you through logging into Biométrico and completing your first student photo registration. By the end, you'll understand the complete workflow from authentication to HikCentral synchronization.
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Check>
+  - Valid user credentials from the IT Department (Dirección de TIC)
+  - One of the authorized roles: `sotics`, `atics`, or `sa`
+  - Student ID (cédula) for registration
+  - Active internet connection to access SIAD and HikCentral APIs
+</Check>
+
+## Step 1: Login to the System
+
+<Steps>
+  <Step title="Access the Login Page">
+    Navigate to the Biométrico application. You'll see the **Sistema Acceso Facial** login screen with the UTLVTE logo.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    The login form includes:
+    - Username field (institutional credentials)
+    - Password field with visibility toggle
+    - "Ingresar" (Enter) button
+  </Step>
+  
+  <Step title="Enter Your Credentials">
+    Input your username and password provided by the IT Department.
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    ```javascript
+    // The system validates credentials against these roles
+    const validRoles = ['sotics', 'atics', 'sa'];
+    ```
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Warning>
+      If you don't have credentials, contact the Dirección de TIC. The system only accepts users with pre-approved roles.
+    </Warning>
+  </Step>
+  
+  <Step title="Submit and Authenticate">
+    Click **Ingresar** to submit your credentials. The system will:
+    
+    1. Send credentials to the authentication endpoint
+    2. Receive a Bearer token and user role
+    3. Store authentication data in localStorage
+    4. Redirect to the home dashboard
+    
+    ```javascript
+    // Authentication response structure
+    {
+      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      token_type: "Bearer",
+      Role: "sotics",
+      name: "Juan Pérez",
+      email: "juan.perez@utelvt.edu.ec"
+    }
+    ```
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Step 2: Navigate to Student Registration
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+After successful login, you'll access the main dashboard.
 
-### Step 3: Go live
+<Steps>
+  <Step title="Access Registration Module">
+    Navigate to **Estudiantes** → **Registro Individual** in the sidebar menu.
+    
+    This corresponds to the route:
+    ```javascript
+    {
+      path: '/estudiantes_registro',
+      name: 'EstudianteR',
+      component: Registro_IndvEst
+    }
+    ```
+  </Step>
+  
+  <Step title="Select Academic Period">
+    Choose the active academic period (Periodo Lectivo) from the radio button options.
+    
+    The system displays available periods from the database, such as:
+    - 2024-2025 Ciclo 1
+    - 2024-2025 Ciclo 2
+    - 2025-2026 Ciclo 1
+  </Step>
+</Steps>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Step 3: Search for a Student
 
-## Next steps
+<Steps>
+  <Step title="Enter Student ID">
+    In the search field, type the student's identification number (cédula).
+    
+    ```vue
+    <input 
+      type="text" 
+      placeholder="Ingresa la cédula a buscar..."
+      v-model="searchQuery"
+      @input="debouncedFilter"
+      @keypress="onlyNumbers"
+      @keyup.enter="buscarEstudiante"
+    />
+    ```
+    
+    <Note>
+      The search field only accepts numeric input. Press Enter to search or use the debounced auto-search.
+    </Note>
+  </Step>
+  
+  <Step title="Review Student Information">
+    Once found, the system displays two information panels:
+    
+    **Personal Information (from SIAD):**
+    - Full name (Nombres, Apellidos)
+    - Institutional email
+    - Academic program (Carrera)
+    - Student photo from SIAD
+    
+    **HikCentral Information:**
+    - Current registration status
+    - Existing photo in HikCentral (if registered)
+    - Comparison view (SIAD photo vs HikCentral photo)
+  </Step>
+</Steps>
 
-Now that you have your docs running, explore these key features:
+## Step 4: Compare and Verify Photos
+
+The registration interface shows a side-by-side photo comparison:
+
+```vue
+<div class="flex justify-center">
+  <!-- SIAD Photo -->
+  <div class="relative">
+    <img :src="getPhotoUrl(estudianteData.CIInfPer)" 
+         class="h-32 w-48 rounded-xl object-cover" />
+    <span class="badge bg-brand-500">SIAD</span>
+  </div>
+  
+  <!-- HikCentral Photo -->
+  <div class="relative">
+    <img :src="getPhotoUrl2(estudianteData.CIInfPer)"
+         class="h-32 w-48 rounded-xl object-cover" />
+    <span class="badge bg-red-500">HIKCENTRAL</span>
+  </div>
+</div>
+```
+
+<Steps>
+  <Step title="Verify Photo Quality">
+    Check that the SIAD photo is:
+    - Clear and well-lit
+    - Shows the student's full face
+    - Recent and recognizable
+    - Suitable for facial recognition
+  </Step>
+  
+  <Step title="Check Registration Status">
+    The system displays a status badge:
+    
+    - <span style={{background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'}}>REGISTRADO</span> - Already in HikCentral
+    - <span style={{background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'}}>NO REGISTRADO</span> - Needs synchronization
+    
+    ```vue
+    <span 
+      v-else
+      :class="estaRegistrado ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+      class="px-2 py-1 rounded-md text-xs font-bold uppercase"
+    >
+      {{ estaRegistrado ? 'Registrado' : 'No Registrado' }}
+    </span>
+    ```
+  </Step>
+</Steps>
+
+## Step 5: Synchronize with HikCentral
+
+<Steps>
+  <Step title="Verify All Information">
+    Before synchronizing, confirm:
+    - Student name is correct
+    - Institutional email is valid
+    - Photo is appropriate
+    - Academic program matches enrollment
+    
+    <Warning>
+      Data sent to HikCentral cannot be easily modified. Double-check all information before synchronizing.
+    </Warning>
+  </Step>
+  
+  <Step title="Click Sincronizar HK">
+    Press the **Sincronizar HK** button to push the student data to HikCentral.
+    
+    The synchronization process:
+    1. Validates student data completeness
+    2. Sends photo and metadata to HikCentral API
+    3. Creates or updates the biometric profile
+    4. Returns confirmation status
+    
+    <Note>
+      The system shows "Verificando en HikCentral..." while processing. Wait for the operation to complete.
+    </Note>
+  </Step>
+  
+  <Step title="Confirm Success">
+    After successful synchronization:
+    - Status badge changes to "REGISTRADO"
+    - HikCentral photo appears in the comparison view
+    - Student can now use facial recognition for access
+  </Step>
+</Steps>
+
+## Complete Workflow Example
+
+Here's a complete example of registering a student:
+
+<CodeGroup>
+```javascript Login Flow
+// 1. User logs in
+const loginData = {
+  email: "admin@utelvt.edu.ec",
+  password: "secure_password"
+};
+
+const response = await axios.post(
+  `${API_URL}/biometrico/login`,
+  loginData
+);
+
+// 2. Store authentication
+localStorage.setItem('token_bio', response.data.token);
+localStorage.setItem('token_type_bio', 'Bearer');
+localStorage.setItem('user_bio', JSON.stringify(response.data));
+
+// 3. Redirect to dashboard
+router.push('/home');
+```
+
+```javascript Search Student
+// 4. Search for student by ID
+const searchQuery = '1234567890';
+const periodoSeleccionado = 15; // Current academic period
+
+const student = await axios.get(
+  `${API_URL}/estudiantes/buscar`,
+  {
+    params: {
+      cedula: searchQuery,
+      periodo: periodoSeleccionado
+    }
+  }
+);
+
+// 5. Display student data
+const estudianteData = {
+  CIInfPer: student.data.CIInfPer,
+  NombInfPer: student.data.NombInfPer,
+  ApellInfPer: student.data.ApellInfPer,
+  mailInst: student.data.mailInst,
+  NombCarr: student.data.NombCarr
+};
+```
+
+```javascript Sync to HikCentral
+// 6. Synchronize with HikCentral
+const syncData = {
+  personId: estudianteData.CIInfPer,
+  personName: `${estudianteData.NombInfPer} ${estudianteData.ApellInfPer}`,
+  email: estudianteData.mailInst,
+  photoUrl: getPhotoUrl(estudianteData.CIInfPer),
+  orgCode: estudianteData.NombCarr
+};
+
+const syncResult = await axios.post(
+  `${API_URL}/hikcentral/sync`,
+  syncData
+);
+
+if (syncResult.data.success) {
+  // Update status
+  estaRegistrado.value = true;
+  // Show success message
+  Swal.fire({
+    icon: 'success',
+    title: 'Sincronización exitosa',
+    text: 'El estudiante ha sido registrado en HikCentral'
+  });
+}
+```
+</CodeGroup>
+
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Faculty Registration" icon="chalkboard-user" href="#">
+    Learn how to register teachers and staff members
+  </Card>
+  
+  <Card title="Batch Operations" icon="users">
+    Process multiple registrations simultaneously
+  </Card>
+  
+  <Card title="Reports & Analytics" icon="chart-line">
+    View registration statistics and system usage
+  </Card>
+  
+  <Card title="Troubleshooting" icon="circle-question">
+    Common issues and solutions
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Tips for Success
+
+<AccordionGroup>
+  <Accordion title="Best practices for photo registration">
+    - Ensure good lighting conditions
+    - Student should face camera directly
+    - Remove glasses if they cause glare
+    - Maintain neutral facial expression
+    - Update photos if student appearance changes significantly
+  </Accordion>
+  
+  <Accordion title="Handling registration errors">
+    If synchronization fails:
+    1. Verify student data is complete
+    2. Check photo file is accessible
+    3. Confirm HikCentral API is responsive
+    4. Review error messages in browser console
+    5. Contact IT support if issues persist
+  </Accordion>
+  
+  <Accordion title="Managing multiple periods">
+    - Always select the correct academic period before searching
+    - Students may appear in multiple periods
+    - Registration persists across periods in HikCentral
+    - Update photos when starting new academic years
+  </Accordion>
+</AccordionGroup>
+
+Congratulations! You've completed your first student registration in Biométrico. The student can now use facial recognition to access campus facilities.

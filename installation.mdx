@@ -1,0 +1,555 @@
+---
+title: Installation
+description: Complete installation and setup guide for the Biométrico facial recognition system
+---
+
+# Installation Guide
+
+This guide covers the complete installation process for Biométrico, from initial setup to production deployment.
+
+## System Requirements
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 14.x or higher (LTS recommended)
+  </Card>
+  
+  <Card title="npm" icon="box">
+    Version 6.x or higher (comes with Node.js)
+  </Card>
+  
+  <Card title="Operating System" icon="desktop">
+    Windows, macOS, or Linux
+  </Card>
+  
+  <Card title="Browser Support" icon="browser">
+    Modern browsers (> 1%, last 2 versions, not IE 11)
+  </Card>
+</CardGroup>
+
+<Note>
+  The application is built with Vue 3 and requires a modern JavaScript environment. Internet Explorer 11 is not supported.
+</Note>
+
+## Installation Steps
+
+### Step 1: Clone or Download the Project
+
+First, obtain the Biométrico source code:
+
+```bash
+# Clone the repository (if using git)
+git clone <repository-url> biometrico
+cd biometrico
+
+# Or extract from archive
+unzip biometrico.zip
+cd biometrico
+```
+
+### Step 2: Install Dependencies
+
+Install all required npm packages:
+
+<CodeGroup>
+```bash npm
+npm install
+```
+
+```bash yarn (alternative)
+yarn install
+```
+</CodeGroup>
+
+This will install all dependencies listed in `package.json`, including:
+
+<AccordionGroup>
+  <Accordion title="Core Framework Dependencies">
+    ```json
+    {
+      "vue": "^3.4.0",
+      "vue-router": "^4.0.3",
+      "vuex": "^4.0.0",
+      "core-js": "^3.8.3"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="UI & Styling Dependencies">
+    ```json
+    {
+      "bootstrap": "^5.3.8",
+      "tailwindcss": "^4.1.17",
+      "@fortawesome/fontawesome-free": "^7.1.0",
+      "flatpickr": "^4.6.13",
+      "sweetalert2": "^11.26.3"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Data Visualization Dependencies">
+    ```json
+    {
+      "apexcharts": "^5.3.6",
+      "vue3-apexcharts": "^1.10.0",
+      "chart.js": "^4.5.0",
+      "chartjs-plugin-datalabels": "^2.2.0",
+      "jsvectormap": "^1.7.0"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Utility Dependencies">
+    ```json
+    {
+      "axios": "^1.13.2",
+      "dayjs": "^1.11.13",
+      "qrcode": "^1.5.4",
+      "uuid": "^13.0.0",
+      "lodash.debounce": "^4.0.8"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Document Generation Dependencies">
+    ```json
+    {
+      "exceljs": "^4.4.0",
+      "jspdf": "^2.5.1",
+      "xlsx": "^0.18.5",
+      "file-saver": "^2.0.5",
+      "pdfjs-dist": "^5.4.149"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  The installation may take several minutes depending on your internet connection. Ensure you have a stable connection.
+</Warning>
+
+### Step 3: Configure Environment
+
+Biométrico uses webpack DefinePlugin for configuration. The API URL is configured in `vue.config.js`:
+
+```javascript vue.config.js
+const webpack = require('webpack');
+
+module.exports = {
+  configureWebpack: {
+    plugins: [
+      new webpack.DefinePlugin({
+        __API_BIOMETRICO__: JSON.stringify(
+          process.env.NODE_ENV === 'production'
+            ? 'http://192.168.1.112:8000/api'
+            : 'http://192.168.1.112:8000/api'
+        ),
+      }),
+    ],
+  },
+};
+```
+
+<Steps>
+  <Step title="Update API Configuration">
+    Modify the API URL in `vue.config.js` to point to your backend server:
+    
+    ```javascript
+    __API_BIOMETRICO__: JSON.stringify(
+      process.env.NODE_ENV === 'production'
+        ? 'https://your-production-api.com/api'
+        : 'http://localhost:8000/api'
+    ),
+    ```
+  </Step>
+  
+  <Step title="Configure Public Path">
+    If deploying to a subdirectory, update the `publicPath`:
+    
+    ```javascript
+    publicPath: process.env.NODE_ENV === 'production' 
+      ? '/biometrico/'  // Deployed at yoursite.com/biometrico/
+      : '/',            // Development at localhost:8080/
+    ```
+  </Step>
+  
+  <Step title="Configure Dev Server Proxy (Optional)">
+    For local development with CORS issues, use the proxy:
+    
+    ```javascript
+    devServer: {
+      proxy: {
+        '/api': {
+          target: 'http://biometricobackend.test',
+          changeOrigin: true,
+          pathRewrite: { '^/api': '' },
+        },
+      },
+    },
+    ```
+  </Step>
+</Steps>
+
+## Development Setup
+
+### Run Development Server
+
+Start the local development server with hot-reload:
+
+```bash
+npm run serve
+```
+
+<Note>
+  The development server typically runs on `http://localhost:8080`. The exact URL will be displayed in the terminal.
+</Note>
+
+You should see output similar to:
+
+```bash
+INFO  Starting development server...
+
+App running at:
+- Local:   http://localhost:8080/
+- Network: http://192.168.1.100:8080/
+
+Note that the development build is not optimized.
+To create a production build, run npm run build.
+```
+
+### Project Structure
+
+Understand the key directories:
+
+```
+biometrico/
+├── public/              # Static assets
+│   └── images/         # Logo and images
+├── src/
+│   ├── assets/         # Styles, JavaScript utilities
+│   │   ├── css/
+│   │   ├── js/
+│   │   │   ├── function/     # Business logic
+│   │   │   │   ├── funciones.js
+│   │   │   │   └── login_function.js
+│   │   │   ├── services/     # API clients
+│   │   │   │   └── axios.js
+│   │   │   └── custom.js
+│   │   └── main.css
+│   ├── components/     # Vue components
+│   │   ├── common/          # Shared components
+│   │   ├── layout/          # Layout components
+│   │   └── Registro/        # Registration components
+│   ├── composables/    # Vue 3 composition functions
+│   │   ├── useSidebar.js
+│   │   └── useUsuario.js
+│   ├── router/         # Vue Router configuration
+│   │   └── index.js
+│   ├── store/          # Vuex state management
+│   │   ├── index.js
+│   │   └── auth.js
+│   ├── views/          # Page components
+│   │   ├── FotosViews/      # Photo management
+│   │   ├── Login/           # Authentication
+│   │   └── HomeView.vue
+│   ├── App.vue         # Root component
+│   └── main.js         # Application entry point
+├── babel.config.js     # Babel configuration
+├── jsconfig.json       # JavaScript configuration
+├── postcss.config.js   # PostCSS configuration
+├── tailwind.config.js  # Tailwind CSS configuration
+├── vue.config.js       # Vue CLI configuration
+└── package.json        # Dependencies and scripts
+```
+
+### Application Entry Point
+
+The application initializes in `src/main.js`:
+
+```javascript src/main.js
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+import store from './store'
+import VueApexCharts from 'vue3-apexcharts'
+import './assets/main.css'
+import 'swiper/css'
+import 'swiper/css/navigation'
+import 'swiper/css/pagination'
+import 'jsvectormap/dist/jsvectormap.css'
+import 'flatpickr/dist/flatpickr.css'
+import '@fortawesome/fontawesome-free/css/all.min.css'
+
+createApp(App)
+  .use(store)
+  .use(router)
+  .use(VueApexCharts)
+  .mount('#app')
+```
+
+## Production Build
+
+### Build for Production
+
+Create an optimized production build:
+
+```bash
+npm run build
+```
+
+This command:
+
+1. Compiles and minifies all source files
+2. Optimizes assets (images, CSS, JS)
+3. Generates files with content hashes for cache busting
+4. Creates the `dist/` directory with production-ready files
+
+<CodeGroup>
+```bash Build Output
+Building for production...
+
+✓ Compiled successfully in 45.2s
+
+File                                      Size             Gzipped
+
+dist/assets/js/app.[hash].js              256.4 KiB        68.2 KiB
+dist/assets/js/chunk-vendors.[hash].js    842.1 KiB        247.3 KiB
+dist/assets/css/app.[hash].css            98.7 KiB         12.1 KiB
+
+Images and other types of assets omitted.
+
+Build completed successfully.
+```
+
+```bash Build Configuration
+// vue.config.js optimization settings
+optimization: {
+  minimize: true,
+  splitChunks: {
+    chunks: 'all',
+  },
+},
+output: {
+  filename: 'assets/js/[name].[contenthash].js',
+  chunkFilename: 'assets/js/[name].[contenthash].js',
+},
+```
+</CodeGroup>
+
+<Note>
+  Production builds have `productionSourceMap: false` to prevent exposing source code. Only the minified code is included.
+</Note>
+
+### Deploy Production Build
+
+The `dist/` folder contains all files needed for deployment:
+
+<Steps>
+  <Step title="Web Server Deployment">
+    Copy the `dist/` folder contents to your web server:
+    
+    ```bash
+    # Apache
+cp -r dist/* /var/www/html/biometrico/
+    
+    # Nginx
+    cp -r dist/* /usr/share/nginx/html/biometrico/
+    ```
+  </Step>
+  
+  <Step title="Configure Server Routes">
+    For Vue Router history mode, configure your server to redirect all routes to `index.html`:
+    
+    **Apache (.htaccess):**
+    ```apache
+    <IfModule mod_rewrite.c>
+      RewriteEngine On
+      RewriteBase /biometrico/
+      RewriteRule ^index\.html$ - [L]
+      RewriteCond %{REQUEST_FILENAME} !-f
+      RewriteCond %{REQUEST_FILENAME} !-d
+      RewriteRule . /biometrico/index.html [L]
+    </IfModule>
+    ```
+    
+    **Nginx:**
+    ```nginx
+    location /biometrico {
+      alias /usr/share/nginx/html/biometrico/;
+      try_files $uri $uri/ /biometrico/index.html;
+    }
+    ```
+  </Step>
+  
+  <Step title="Set Permissions">
+    Ensure proper file permissions:
+    
+    ```bash
+    # Set ownership
+    chown -R www-data:www-data /var/www/html/biometrico/
+    
+    # Set permissions
+    find /var/www/html/biometrico/ -type f -exec chmod 644 {} \;
+    find /var/www/html/biometrico/ -type d -exec chmod 755 {} \;
+    ```
+  </Step>
+</Steps>
+
+## Backend API Setup
+
+Biométrico requires a backend API for authentication and data management.
+
+### API Endpoints Required
+
+Ensure your backend provides these endpoints:
+
+```javascript
+// Authentication
+POST   /api/biometrico/login       // User login
+GET    /api/biometrico/me          // Get authenticated user
+
+// Student Management  
+GET    /api/estudiantes/buscar     // Search students
+GET    /api/estudiantes/foto/:id   // Get student photo
+POST   /api/estudiantes/sync       // Sync to SIAD
+
+// Faculty Management
+GET    /api/docentes/buscar        // Search faculty
+GET    /api/docentes/foto/:id      // Get faculty photo
+
+// HikCentral Integration
+POST   /api/hikcentral/sync        // Sync to HikCentral
+GET    /api/hikcentral/status/:id  // Check registration status
+
+// Academic Periods
+GET    /api/periodos               // List academic periods
+```
+
+### CORS Configuration
+
+Configure CORS on your backend to allow requests from the frontend:
+
+```php Laravel Example
+// config/cors.php
+return [
+    'paths' => ['api/*'],
+    'allowed_origins' => ['http://localhost:8080', 'https://your-domain.com'],
+    'allowed_methods' => ['*'],
+    'allowed_headers' => ['*'],
+    'supports_credentials' => true,
+];
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="npm install fails">
+    **Issue:** Dependency installation errors
+    
+    **Solutions:**
+    - Clear npm cache: `npm cache clean --force`
+    - Delete `node_modules` and `package-lock.json`, then reinstall
+    - Use a specific Node.js version with nvm: `nvm use 16`
+    - Check for network/firewall issues
+    - Try using `--legacy-peer-deps` flag: `npm install --legacy-peer-deps`
+  </Accordion>
+  
+  <Accordion title="Development server won't start">
+    **Issue:** `npm run serve` fails
+    
+    **Solutions:**
+    - Check if port 8080 is already in use
+    - Kill existing Node processes: `killall node`
+    - Try a different port: `PORT=3000 npm run serve`
+    - Check for syntax errors in `vue.config.js`
+    - Ensure all dependencies are installed
+  </Accordion>
+  
+  <Accordion title="API requests fail with CORS errors">
+    **Issue:** Browser blocks API requests
+    
+    **Solutions:**
+    - Configure CORS headers on backend
+    - Use the dev server proxy in `vue.config.js`
+    - Check that API URL is correct in webpack config
+    - Verify backend is running and accessible
+  </Accordion>
+  
+  <Accordion title="Production build errors">
+    **Issue:** `npm run build` fails
+    
+    **Solutions:**
+    - Check for unused imports or undefined variables
+    - Ensure all environment variables are set
+    - Verify all dependencies are in `dependencies` not `devDependencies`
+    - Increase Node memory: `NODE_OPTIONS=--max_old_space_size=4096 npm run build`
+    - Review error messages for specific file/line issues
+  </Accordion>
+  
+  <Accordion title="Authentication not working">
+    **Issue:** Login fails or tokens not stored
+    
+    **Solutions:**
+    - Check browser console for errors
+    - Verify API endpoint is correct
+    - Ensure localStorage is not blocked (private browsing)
+    - Check backend returns correct token format
+    - Verify role is one of: `sotics`, `atics`, `sa`
+  </Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+<Warning>
+  **Important Security Practices:**
+  
+  - Never commit sensitive credentials to version control
+  - Use HTTPS in production
+  - Implement rate limiting on authentication endpoints
+  - Regularly update dependencies for security patches
+  - Validate and sanitize all user input on backend
+  - Use strong JWT secret keys
+  - Implement token expiration and refresh mechanisms
+</Warning>
+
+### Update Dependencies
+
+Regularly check for security updates:
+
+```bash
+# Check for outdated packages
+npm outdated
+
+# Update to latest compatible versions
+npm update
+
+# Check for security vulnerabilities
+npm audit
+
+# Fix vulnerabilities automatically
+npm audit fix
+```
+
+## Next Steps
+
+After successful installation:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Complete your first student registration
+  </Card>
+  
+  <Card title="Configuration" icon="gear">
+    Advanced configuration options
+  </Card>
+  
+  <Card title="API Integration" icon="plug">
+    Connect to backend services
+  </Card>
+  
+  <Card title="Deployment" icon="server">
+    Production deployment strategies
+  </Card>
+</CardGroup>
+
+Your Biométrico installation is now complete! Proceed to the [Quickstart Guide](/quickstart) to begin using the system.

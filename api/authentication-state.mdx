@@ -1,0 +1,247 @@
+---
+title: Authentication State Management
+description: How authentication state is managed in the Biométrico application
+---
+
+## Overview
+
+The Biométrico application manages authentication state through a combination of Vuex store and localStorage, providing both runtime state management and session persistence across browser refreshes.
+
+## Authentication Flow
+
+### 1. Login Process
+
+When a user logs in, the application validates credentials and stores the authentication data:
+
+```javascript
+import store from '@/store';
+
+export async function enviarsolilogin(method, parametros, url, mensaje) {
+  const response = await axios({
+    method: method,
+    url: url,
+    data: parametros,
+  });
+
+  if (response.data && response.data.token) {
+    if (response.data.Role === "sotics" || 
+        response.data.Role === "atics" || 
+        response.data.Role === "sa") {
+      
+      store.commit("setRol_bio", response.data.Role);
+      store.commit("setemail_bio", response.data.email);
+      store.commit("setname_bio", response.data.name);
+      store.commit("setToken_bio", response.data.token);
+      store.commit("setTokenType_bio", response.data.token_type || "Bearer");
+      
+      return {
+        token: response.data.token,
+        Rol: response.data.Role,
+        name: response.data.name,
+        email: response.data.email,
+      };
+    }
+  }
+}
+```
+
+**Source**: `src/assets/js/function/login_function.js:21-35`
+
+### 2. Session Persistence
+
+All authentication data is stored in localStorage to persist across browser sessions:
+
+<ParamField path="token_bio" type="string">
+  JWT authentication token
+</ParamField>
+
+<ParamField path="token_type_bio" type="string">
+  Token type ("Bearer")
+</ParamField>
+
+<ParamField path="Rol_bio" type="string">
+  User role (sotics, atics, or sa)
+</ParamField>
+
+<ParamField path="email_bio" type="string">
+  User's email address
+</ParamField>
+
+<ParamField path="name_bio" type="string">
+  User's full name
+</ParamField>
+
+<ParamField path="id_bio" type="string">
+  User's ID
+</ParamField>
+
+### 3. State Initialization
+
+On application load, the Vuex store initializes from localStorage:
+
+```javascript
+state: {
+  role: localStorage.getItem('Rol_bio') || null,
+  email: localStorage.getItem('email_bio') || null,
+  idusu: localStorage.getItem('id_bio') || null,
+  name: localStorage.getItem('name_bio') || null,
+  token: localStorage.getItem('token_bio') || null,
+  token_type: localStorage.getItem('token_type_bio') || null,
+}
+```
+
+**Source**: `src/store/index.js:4-11`
+
+## User Roles
+
+The system supports three user roles:
+
+<ParamField path="sotics" type="role">
+  SOTICS (Servicios de Organización de Tecnologías de Información y Comunicaciones) staff member
+</ParamField>
+
+<ParamField path="atics" type="role">
+  ATICS (Área de Tecnologías de Información y Comunicaciones) staff member
+</ParamField>
+
+<ParamField path="sa" type="role">
+  System administrator with full access
+</ParamField>
+
+## Checking Authentication Status
+
+### Using the isAuthenticated Getter
+
+The most common way to check if a user is logged in:
+
+```javascript
+if (this.$store.getters.isAuthenticated) {
+  // User has a valid token
+  console.log('User is authenticated');
+} else {
+  // Redirect to login
+  this.$router.push('/');
+}
+```
+
+**Source**: `src/store/index.js:14`
+
+### Getting User Information
+
+```javascript
+// Get user ID
+const userId = this.$store.getters.getIdusu;
+
+// Get user role
+const userRole = this.$store.state.role;
+
+// Get user email
+const userEmail = this.$store.state.email;
+
+// Get user name
+const userName = this.$store.state.name;
+```
+
+## Automatic Token Attachment
+
+The Axios interceptor automatically attaches the authentication token to all API requests:
+
+```javascript
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token_bio");
+    const tokenType = localStorage.getItem("token_type_bio");
+
+    if (token && tokenType) {
+      config.headers.Authorization = `${tokenType} ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    console.error("❌ Error en la solicitud:", error);
+    return Promise.reject(error);
+  }
+);
+```
+
+**Source**: `src/assets/js/services/axios.js:8-23`
+
+## Session Expiration Handling
+
+When the server returns a 401 Unauthorized response, the application automatically:
+1. Logs the session expiration
+2. Clears the authentication tokens from localStorage
+3. Redirects to the login page
+
+```javascript
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      console.warn("🔒 Sesión expirada. Cerrando sesión...");
+      localStorage.removeItem("token_bio");
+      localStorage.removeItem("token_type_bio");
+      window.location.href = "/biometrico"; // Redirect to login
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+**Source**: `src/assets/js/services/axios.js:36-41`
+
+## Logout Process
+
+To properly log out a user and clear all session data:
+
+```javascript
+// Clear all authentication state
+this.$store.commit('logout_bio');
+
+// Redirect to login page
+this.$router.push('/');
+```
+
+The `logout_bio` mutation clears:
+- All Vuex store state
+- All localStorage keys (Rol_bio, email_bio, id_bio, name_bio, token_bio, token_type_bio, user_bio)
+
+**Source**: `src/store/index.js:42-58`
+
+## Security Considerations
+
+### Token Storage
+
+- Tokens are stored in localStorage for persistence
+- While localStorage is vulnerable to XSS attacks, it's commonly used for SPAs
+- The 90-second request timeout helps limit exposure
+
+### Token Transmission
+
+- Tokens are sent in the Authorization header using Bearer scheme
+- All API communication should use HTTPS in production
+
+### Role Validation
+
+- Login only succeeds for valid roles: sotics, atics, or sa
+- Invalid roles are rejected during authentication
+
+```javascript
+if (response.data.Role === "sotics" || 
+    response.data.Role === "atics" || 
+    response.data.Role === "sa") {
+  // Proceed with login
+} else {
+  // Reject login
+}
+```
+
+**Source**: `src/assets/js/function/login_function.js:21`
+
+## Best Practices
+
+1. **Always use getters**: Use `isAuthenticated` getter instead of directly checking `state.token`
+2. **Centralized logout**: Always use the `logout_bio` mutation to ensure complete cleanup
+3. **Let interceptors handle tokens**: Don't manually add Authorization headers; the Axios interceptor handles this
+4. **Handle 401 errors gracefully**: The response interceptor automatically handles session expiration

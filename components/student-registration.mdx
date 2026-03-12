@@ -1,0 +1,348 @@
+---
+title: Student Registration
+description: Individual student registration component with HikCentral integration
+---
+
+## Overview
+
+The `RegistroIndivEst` component provides functionality for searching students, viewing their information, and synchronizing their photos with HikCentral biometric system.
+
+## Component Location
+
+```
+src/components/Registro/RegistroIndivEst.vue
+```
+
+## Features
+
+- Student search by ID (cedula)
+- Academic period selection
+- Student information display
+- Photo comparison (SIAD vs HikCentral)
+- Facial similarity calculation
+- HikCentral registration/update
+- Real-time registration status
+
+## Usage
+
+```vue
+<template>
+  <RegistroIndivEst />
+</template>
+
+<script setup>
+import RegistroIndivEst from '@/components/Registro/RegistroIndivEst.vue'
+</script>
+```
+
+## Data Properties
+
+```javascript
+data() {
+  return {
+    baseUrl: "/biometrico",
+    estudianteData: null,
+    searchQuery: "",
+    cargando: false,
+    estencontrado: true,
+    estaRegistrado: false,
+    cargandoStatus: false,
+    comparando: false,
+    periodosList: [],
+    periodoSeleccionado: null,
+    comparacionResultado: null,
+    personIdHC: null,
+  }
+}
+```
+
+## Key Methods
+
+### cargarPeriodos()
+
+Loads available academic periods:
+
+```javascript
+async cargarPeriodos() {
+  try {
+    const response = await API.get(`${this.baseUrl}/get-periodos-rec`);
+    if (response.data.status) {
+      this.periodosList = response.data.data;
+      if (this.periodosList.length > 0) {
+        this.periodoSeleccionado = this.periodosList[0].idper;
+      }
+    }
+  } catch (error) {
+    console.error("Error al cargar periodos:", error);
+  }
+}
+```
+
+### buscarEstudiante()
+
+Searches for a student and verifies HikCentral registration:
+
+```javascript
+async buscarEstudiante() {
+  if (!this.periodoSeleccionado) {
+    alert("Por favor seleccione un periodo");
+    return;
+  }
+  
+  this.cargando = true;
+  this.estudianteData = null;
+  this.comparacionResultado = null;
+  
+  try {
+    const response = await API.get(
+      `/biometrico/getindivEst/${this.searchQuery}`,
+      { params: { idper: this.periodoSeleccionado } }
+    );
+    
+    if (!response.data || response.data.length === 0) {
+      this.estencontrado = false;
+    } else {
+      this.estencontrado = true;
+      this.estudianteData = response.data;
+      await this.verificarRegistroHC(this.estudianteData.CIInfPer);
+      if (this.estaRegistrado) {
+        await this.ejecutarComparacion(this.estudianteData.CIInfPer);
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error al buscar:", error);
+    this.estencontrado = false;
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+### verificarRegistroHC(ci)
+
+Verifies if a student is registered in HikCentral:
+
+```javascript
+async verificarRegistroHC(ci) {
+  this.cargandoStatus = true;
+  try {
+    const response = await API.get(`${this.baseUrl}/getperson-est/${ci}`);
+    this.personIdHC = response.data.personId;
+    this.estaRegistrado = response.data.registrado;
+  } catch (error) {
+    this.estaRegistrado = false;
+  } finally {
+    this.cargandoStatus = false;
+  }
+}
+```
+
+### ejecutarComparacion(ci)
+
+Compares photos between SIAD and HikCentral:
+
+```javascript
+async ejecutarComparacion(ci) {
+  this.comparando = true;
+  try {
+    const { data } = await API.get(
+      `${this.baseUrl}/compare-hikdoc-est/${ci}`
+    );
+    this.comparacionResultado = data;
+    
+    if (data.identicas) {
+      console.log(`✅ Match: ${data.similitud}%`);
+    } else {
+      console.log(`❌ Diferentes: Solo ${data.similitud} de parecido.`);
+    }
+  } catch (error) {
+    alert("Error en la comparación");
+  } finally {
+    this.comparando = false;
+  }
+}
+```
+
+### registrarEnHikCentral(post)
+
+Registers a student in HikCentral:
+
+```javascript
+async registrarEnHikCentral(post) {
+  if (!confirm(`¿Deseas registrar a ${post} en HikCentral?`)) return;
+  
+  this.cargando = true;
+  try {
+    const response = await API.post(
+      `${this.baseUrl}/sync-hikdoc-est-id/${post}`,
+      {},
+      { params: { idper: this.periodoSeleccionado } }
+    );
+    
+    if (response.data.code === "0" || response.data.msg === "Success") {
+      alert(`✅ Registrado con éxito. ID en HC: ${response.data.data}`);
+      await this.verificarRegistroHC(this.estudianteData.CIInfPer);
+      if (this.estaRegistrado) {
+        await this.ejecutarComparacion(this.estudianteData.CIInfPer);
+      }
+    } else if (response.data.code === "128") {
+      alert("La foto no es compatible con HikCentral.");
+    }
+  } catch (error) {
+    this.searchQuery = '';
+    this.estencontrado = false;
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+### UpdateEnHikCentral(post)
+
+Updates a student's photo in HikCentral:
+
+```javascript
+async UpdateEnHikCentral(post) {
+  if (!this.personIdHC) {
+    alert("❌ No se encontró el PersonId de HikCentral.");
+    return;
+  }
+  
+  if (!confirm(`¿Deseas actualizar a ${post} en HikCentral?`)) return;
+  
+  this.cargando = true;
+  try {
+    const response = await API.post(
+      `${this.baseUrl}/sync-hikdoc-update/${post}`,
+      { personaId: this.personIdHC },
+      { params: { idper: this.periodoSeleccionado } }
+    );
+    
+    if (response.data.code === "0" || response.data.msg === "Success") {
+      alert(`✅ Actualizado con éxito.`);
+      await this.verificarRegistroHC(this.estudianteData.CIInfPer);
+      if (this.estaRegistrado) {
+        await this.ejecutarComparacion(this.estudianteData.CIInfPer);
+      }
+    }
+  } catch (error) {
+    this.estencontrado = false;
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+## Helper Methods
+
+### getPhotoUrl(ci)
+
+Generates URL for SIAD photo:
+
+```javascript
+getPhotoUrl(ci) {
+  const baseURL2 = API.defaults.baseURL;
+  return `${baseURL2}/biometrico/fotografia/${ci}?t=${new Date().getTime()}`;
+}
+```
+
+### getPhotoUrl2(ci)
+
+Generates URL for HikCentral photo:
+
+```javascript
+getPhotoUrl2(ci) {
+  const baseURL2 = API.defaults.baseURL;
+  return `${baseURL2}/biometrico/gethick/${ci}?t=${new Date().getTime()}`;
+}
+```
+
+### onlyNumbers(event)
+
+Restricts input to numbers only:
+
+```javascript
+onlyNumbers(event) {
+  const charCode = event.charCode ? event.charCode : event.keyCode;
+  if (charCode < 48 || charCode > 57) {
+    event.preventDefault();
+  }
+}
+```
+
+## Template Structure
+
+<Tabs>
+  <Tab title="Search Form">
+    ```vue
+    <form class="flex-grow">
+      <div class="relative">
+        <input 
+          type="text" 
+          placeholder="Ingresa la cédula a buscar..." 
+          v-model="searchQuery"
+          @input="debouncedFilter" 
+          @keypress="onlyNumbers" 
+          @keyup.enter="buscarEstudiante" />
+      </div>
+    </form>
+    ```
+  </Tab>
+  
+  <Tab title="Period Selection">
+    ```vue
+    <div class="mt-4 flex flex-wrap gap-4 items-center">
+      <span>Periodo Lectivo:</span>
+      <div v-for="periodo in periodosList" :key="periodo.idper">
+        <input 
+          type="radio" 
+          :id="'periodo-' + periodo.idper" 
+          :value="periodo.idper"
+          v-model="periodoSeleccionado" />
+        <label :for="'periodo-' + periodo.idper">
+          {{ periodo.DescPerLec }}
+        </label>
+      </div>
+    </div>
+    ```
+  </Tab>
+  
+  <Tab title="Photo Comparison">
+    ```vue
+    <div class="mb-4 flex justify-center">
+      <div class="relative">
+        <img :src="getPhotoUrl(estudianteData.CIInfPer)" />
+        <span class="badge">SIAD</span>
+      </div>
+      <div class="relative">
+        <img :src="getPhotoUrl2(estudianteData.CIInfPer)" />
+        <span class="badge">HIKCENTRAL</span>
+      </div>
+    </div>
+    
+    <div v-if="comparacionResultado">
+      <span>Similitud: {{ comparacionResultado.similitud }}%</span>
+      <span>{{ comparacionResultado.identicas ? 'Coincide' : 'No coincide' }}</span>
+    </div>
+    ```
+  </Tab>
+</Tabs>
+
+## Lifecycle
+
+```javascript
+mounted() {
+  this.cargarPeriodos();
+}
+```
+
+## API Endpoints Used
+
+- `GET /biometrico/get-periodos-rec` - Get academic periods
+- `GET /biometrico/getindivEst/{ci}` - Get student info
+- `GET /biometrico/getperson-est/{ci}` - Check HikCentral registration
+- `GET /biometrico/compare-hikdoc-est/{ci}` - Compare photos
+- `POST /biometrico/sync-hikdoc-est-id/{ci}` - Register in HikCentral
+- `POST /biometrico/sync-hikdoc-update/{ci}` - Update in HikCentral
+- `GET /biometrico/fotografia/{ci}` - Get SIAD photo
+- `GET /biometrico/gethick/{ci}` - Get HikCentral photo

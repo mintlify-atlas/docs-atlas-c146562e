@@ -1,0 +1,74 @@
+---
+title: Component Architecture Overview
+description: Overview of the Biométrico project component architecture and organization
+---
+
+## Component Architecture
+
+The Biométrico project is built with Vue 3 and follows a modular component architecture. Components are organized into three main directories:
+
+### Directory Structure
+
+```
+src/components/
+├── layout/          # Layout components
+├── common/          # Reusable common components
+├── Registro/        # Registration components
+├── fotos/           # Photo management components
+└── Modal/           # Modal components
+```
+
+## Layout Components
+
+Layout components provide the main application structure:
+
+- **AdminLayout** - Main admin dashboard layout with sidebar and header
+- **AppHeader** - Application header with navigation and theme toggle
+- **AppSidebar** - Collapsible sidebar navigation
+- **Backdrop** - Modal backdrop overlay
+
+## Common Components
+
+Reusable components used throughout the application:
+
+- **PageBreadcrumb** - Breadcrumb navigation
+- **ThemeToggler** - Dark/light theme switcher
+- **ComponentCard** - Card wrapper component
+- **DropdownMenu** - Dropdown menu component
+
+## Registration Components
+
+Components for managing user registration:
+
+- **RegistroIndivEst** - Individual student registration
+- **RegistroIndivDoc** - Individual teacher/staff registration
+- **RegistroIndivPreEst** - Pre-student registration
+
+## Photo Components
+
+Components for photo management and upload:
+
+- **estudiantes_foto** - Student photo management
+- **docentes_foto** - Teacher/staff photo management
+- **estudiantes_pre_foto** - Pre-student photo management
+
+## Modal Components
+
+- **Modal** - Base modal component with backdrop and close functionality
+
+## Component Communication
+
+Components communicate using:
+
+- **Props** - Parent to child data passing
+- **Events** - Child to parent communication
+- **Composables** - Shared reactive state (e.g., `useSidebar`, `useTheme`)
+- **Provide/Inject** - Deep component tree communication
+
+## Styling Approach
+
+The project uses:
+
+- **Tailwind CSS** - Utility-first CSS framework
+- **Dark Mode** - Built-in dark mode support via Tailwind
+- **Custom CSS Classes** - Component-specific styles when needed

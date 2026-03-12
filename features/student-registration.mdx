@@ -1,0 +1,249 @@
+---
+title: 'Student Photo Registration'
+description: 'Register and manage student photos for biometric access control with HikCentral integration'
+---
+
+## Overview
+
+The Student Photo Registration feature enables administrators to manage student biometric data by registering photos from the SIAD (Academic Information System) into the HikCentral access control platform. This feature supports both individual and bulk registration workflows.
+
+## Individual Registration
+
+### Search and Verify Student
+
+The individual registration workflow allows administrators to register students one at a time with full verification capabilities.
+
+<Steps>
+  <Step title="Select Academic Period">
+    Choose the appropriate academic period from the available options. The system displays:
+    - Current active period
+    - Previous period
+  </Step>
+  
+  <Step title="Search by ID">
+    Enter the student's ID number (cedula) in the search field. The system validates numeric input only and searches on Enter key press.
+    
+    ```javascript
+    // ID validation - numbers only
+    onlyNumbers(event) {
+      const charCode = event.charCode ? event.charCode : event.keyCode;
+      if (charCode < 48 || charCode > 57) {
+        event.preventDefault();
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Review Student Information">
+    The system displays comprehensive student details:
+    - Full name
+    - ID number (cedula)
+    - Academic program (carrera)
+    - Institutional email
+    - Photo from SIAD system
+  </Step>
+  
+  <Step title="Photo Comparison">
+    View side-by-side comparison:
+    - **SIAD Photo**: Current photo in academic system
+    - **HIKCENTRAL Photo**: Photo in biometric system (if registered)
+    
+    The system automatically calculates facial similarity percentage when both photos exist.
+  </Step>
+</Steps>
+
+### Registration Status
+
+The system displays three possible states:
+
+<Card title="Not Registered" icon="xmark" color="#ef4444">
+  Student photo has not been sent to HikCentral. Click "Enviar Foto a HIK" to register.
+</Card>
+
+<Card title="Registered - Low Similarity" icon="triangle-exclamation" color="#f59e0b">
+  Student is registered but facial similarity is below threshold. Click "Actualizar Foto en HIK (Baja Similitud)" to update.
+</Card>
+
+<Card title="Registered - Validated" icon="check" color="#10b981">
+  Student is registered and photos match with high similarity. No action needed.
+</Card>
+
+### Registration Actions
+
+**Initial Registration**
+
+```javascript
+// Register new student in HikCentral
+const response = await API.post(`/biometrico/sync-hikdoc-est-id/${cedula}`, {}, {
+  params: { idper: periodoSeleccionado }
+});
+```
+
+**Update Existing Photo**
+
+```javascript
+// Update photo for existing person
+const response = await API.post(`/biometrico/sync-hikdoc-update/${cedula}`, {
+  personaId: personIdHC
+}, {
+  params: { idper: periodoSeleccionado }
+});
+```
+
+<Note>
+  The system automatically validates the registration after sending and calculates facial similarity to ensure successful synchronization.
+</Note>
+
+## Bulk Registration
+
+### Student List View
+
+The bulk management interface provides a comprehensive table view with filtering and search capabilities.
+
+**Search and Filter Options:**
+
+- **Text Search**: Search by ID number or student name with debounced input (900ms delay)
+- **Academic Program Filter**: Filter students by specific academic program (carrera) or view all
+- **Total Count**: Displays total number of enrolled students with photos
+
+```vue
+<input 
+  type="text" 
+  placeholder="Ingresa la cédula o nombre a buscar..." 
+  v-model="searchQuery"
+  @input="debouncedFilter"
+/>
+
+<select v-model="selectedCarrera" @change="debouncedFilter">
+  <option value="Todos">Todas las Carreras</option>
+  <option v-for="carrera in carrerasList" :value="carrera.id">
+    {{ carrera.nombre }}
+  </option>
+</select>
+```
+
+### Table Columns
+
+The student table displays:
+
+| Column | Description |
+|--------|-------------|
+| **Estudiante** | Profile photo, ID, and full name |
+| **Carrera** | Academic program name |
+| **Foto HIKCENTRAL** | Current photo in biometric system |
+| **Registrado en HIKCENTRAL** | Registration status (Yes/No) |
+
+### Registration Status Indicators
+
+<Card title="Verification Process" icon="spinner">
+  The system automatically verifies registration status for each displayed student:
+  
+  ```javascript
+  async verificarRegistrosMasivos() {
+    for (let post of items) {
+      const res = await API.get(`/biometrico/getperson-est/${post.CIInfPer}`);
+      post.estaRegistradoHC = res.data.registrado;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+  ```
+</Card>
+
+### Bulk Synchronization
+
+The mass synchronization feature processes pending registrations automatically.
+
+<Steps>
+  <Step title="Initiate Bulk Sync">
+    Click "Sincronizar Pendientes (Masivo)" button to start batch processing.
+  </Step>
+  
+  <Step title="Fetch Pending Students">
+    System retrieves all students with photos who are not registered in HikCentral:
+    
+    ```javascript
+    const { data } = await API.get('/biometrico/get-pending-sync-est', {
+      params: { carrera_name: selectedCarrera }
+    });
+    ```
+  </Step>
+  
+  <Step title="Process Queue">
+    Students are processed sequentially with progress tracking:
+    - Current student name displayed
+    - Progress bar showing completion percentage
+    - Individual success/error logging
+  </Step>
+</Steps>
+
+**Progress Indicator:**
+
+```vue
+<div v-if="syncMode" class="mb-4 p-4 border rounded-xl">
+  <div class="flex justify-between mb-2">
+    <span>Sincronizando: {{ syncIndex }} / {{ pendientes.length }}</span>
+    <span>{{ progressSync }}%</span>
+  </div>
+  <div class="w-full bg-gray-200 rounded-full h-2.5">
+    <div class="bg-brand-500 h-2.5 rounded-full" 
+         :style="{ width: progressSync + '%' }">
+    </div>
+  </div>
+  <p class="text-xs mt-2 italic">Procesando: {{ currentSyncName }}</p>
+</div>
+```
+
+<Warning>
+  During bulk synchronization, the button is disabled to prevent duplicate processing. A 300ms delay between requests prevents server overload.
+</Warning>
+
+## Error Handling
+
+### Common Response Codes
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| `0` | Success | Registration completed |
+| `128` | Invalid photo format | Photo not compatible with HikCentral |
+| `131` | Already registered | Student already exists in system |
+
+### Photo Compatibility
+
+<Note>
+  Photos must meet HikCentral requirements:
+  - JPEG or PNG format
+  - Minimum resolution for facial recognition
+  - Clear frontal face visible
+  - Code 128 indicates the photo doesn't meet these requirements
+</Note>
+
+## Pagination
+
+The student list supports server-side pagination:
+
+```javascript
+nextPage() {
+  if (this.currentPage < this.lastPage && !this.cargando) {
+    this.getAdministrativosD(
+      this.currentPage + 1, 
+      this.searchQuery, 
+      this.selectedCarrera
+    );
+  }
+}
+```
+
+- Navigate between pages using Previous/Next buttons
+- Current page and total pages displayed
+- Filters persist across page navigation
+- Automatic reset to page 1 when filters change
+
+## Best Practices
+
+<Card title="Workflow Recommendations" icon="lightbulb">
+  1. **Select correct academic period** before individual registration
+  2. **Review similarity percentage** before deciding to update photos
+  3. **Use bulk sync during off-peak hours** to avoid system load
+  4. **Filter by academic program** for targeted mass updates
+  5. **Verify registration status** after bulk operations complete
+</Card>

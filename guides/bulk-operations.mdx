@@ -1,0 +1,376 @@
+---
+title: 'Bulk Operations'
+description: 'Perform bulk synchronization, download photos in ZIP format, and manage large datasets efficiently'
+---
+
+## Overview
+
+The Biométrico system provides bulk operations for managing large numbers of student/staff photos, including:
+
+- **Bulk Sync to HikCentral** - Register all pending users to the biometric system
+- **Mass ZIP Download** - Export all photos organized by career/department
+
+## Bulk Sync to HikCentral
+
+### Workflow
+
+<Steps>
+  <Step title="Fetch Pending Users">
+    The system retrieves all users who are not yet registered in HikCentral:
+
+    ```javascript
+    const { data } = await API.get(`${this.baseUrl}/get-pending-sync-est`, {
+      params: { carrera_name: this.selectedCarrera }
+    });
+
+    this.pendientes = data.pendientes;
+    ```
+
+    This returns an array of students/staff who need to be synced.
+  </Step>
+
+  <Step title="Display Progress Bar">
+    A progress bar shows real-time sync status:
+
+    ```vue
+    <div v-if="syncMode" class="p-4 border rounded-xl">
+      <div class="flex justify-between mb-2">
+        <span>Sincronizando con HikCentral: {{ syncIndex }} / {{ pendientes.length }}</span>
+        <span class="font-bold">{{ progressSync }}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2.5">
+        <div class="bg-brand-500 h-2.5 rounded-full" 
+             :style="{ width: progressSync + '%' }">
+        </div>
+      </div>
+      <p class="text-xs mt-2 italic">Procesando: {{ currentSyncName }}</p>
+    </div>
+    ```
+  </Step>
+
+  <Step title="Process Each User Sequentially">
+    To avoid rate limiting (HTTP 429 errors) and timeouts, users are synced one at a time:
+
+    ```javascript
+    for (const p of this.pendientes) {
+      this.currentSyncName = p.NombInfPer;
+
+      try {
+        const res = await API.post(`${this.baseUrl}/sync-hikdoc/${p.CIInfPer}`);
+
+        if (res.data.code === "0" || res.data.msg === "Success") {
+          console.log(`✅ Sincronizado: ${p.CIInfPer}`);
+        } else if (res.data.code === "131") {
+          console.warn(`⚠️ Ya registrado: ${p.CIInfPer}`);
+        } else if (res.data.code === "128") {
+          console.warn(`La foto de: ${p.CIInfPer} no es compatible con HikCentral.`);
+        }
+      } catch (e) {
+        console.error(`❌ Error en CI ${p.CIInfPer}:`, e.response?.data || e.message);
+      }
+
+      this.syncIndex++;
+      // 300ms delay to be server-friendly
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    ```
+  </Step>
+
+  <Step title="Complete and Refresh">
+    After all users are processed, display a success message and refresh the table:
+
+    ```javascript
+    alert("Sincronización masiva finalizada.");
+    this.getAdministrativosD(this.currentPage, this.searchQuery, this.selectedCarrera);
+    this.syncMode = false;
+    ```
+  </Step>
+</Steps>
+
+### Progress Calculation
+
+```javascript
+computed: {
+  progressSync() {
+    return this.pendientes.length > 0
+      ? Math.round((this.syncIndex / this.pendientes.length) * 100)
+      : 0;
+  }
+}
+```
+
+### Button to Start Bulk Sync
+
+```vue
+<button 
+  @click="iniciarSincronizacionMasiva" 
+  :disabled="cargando || syncMode"
+  class="btn btn-primary">
+  Sincronizar Pendientes (Masivo)
+</button>
+```
+
+### Full Implementation
+
+```javascript
+async iniciarSincronizacionMasiva() {
+  if (!confirm("Se buscarán usuarios no registrados y se enviarán a HikCentral. ¿Continuar?")) {
+    return;
+  }
+
+  this.syncMode = true;
+  this.syncIndex = 0;
+
+  try {
+    const { data } = await API.get(`${this.baseUrl}/get-pending-sync-est`, {
+      params: { carrera_name: this.selectedCarrera }
+    });
+
+    this.pendientes = data.pendientes;
+
+    if (this.pendientes.length === 0) {
+      alert("No se encontraron usuarios pendientes de registro.");
+      this.syncMode = false;
+      return;
+    }
+
+    for (const p of this.pendientes) {
+      this.currentSyncName = p.NombInfPer;
+
+      try {
+        const res = await API.post(`${this.baseUrl}/sync-hikdoc/${p.CIInfPer}`);
+        // Handle response...
+      } catch (e) {
+        console.error(`❌ Error en CI ${p.CIInfPer}:`, e.response?.data || e.message);
+      }
+
+      this.syncIndex++;
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    alert("Sincronización masiva finalizada.");
+    this.getAdministrativosD(this.currentPage, this.searchQuery, this.selectedCarrera);
+  } catch (error) {
+    alert("Error al obtener la lista de pendientes.");
+  } finally {
+    this.syncMode = false;
+  }
+}
+```
+
+## Bulk ZIP Download
+
+### Overview
+
+Export all student/staff photos organized by career/department into a single ZIP file.
+
+<Steps>
+  <Step title="Initiate Download">
+    Click the download button to start the bulk export:
+
+    ```vue
+    <button class="btn btn-primary" @click="descargarDatosMasiva">
+      Descargar en formato ZIP
+    </button>
+    ```
+  </Step>
+
+  <Step title="Fetch All Photos (Single API Call)">
+    The system makes **one API request** to retrieve all student data with Base64-encoded photos:
+
+    ```javascript
+    const response = await API.get(`${this.baseUrl}/descargarfotosmasiva`, {
+      timeout: 600000, // 10 minutes
+    });
+
+    const registros = response.data?.data || [];
+    ```
+
+    <Note>
+      The timeout is increased to 10 minutes because this operation processes thousands of records.
+    </Note>
+  </Step>
+
+  <Step title="Process Base64 Photos">
+    Each photo is decoded from Base64 and added to the ZIP file:
+
+    ```javascript
+    for (const post of registros) {
+      try {
+        // Decode Base64 to binary
+        const byteCharacters = atob(post.fotografia);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+
+        // Create folder by career
+        const carreraNombre = post.NombCarr
+          ? post.NombCarr.replace(/[\\/:*?"<>|]/g, "_").trim()
+          : "Sin_Carrera";
+        const folder = zip.folder(carreraNombre);
+
+        // Generate filename
+        const nombre = (post.NombInfPer || "sinNombre").replace(/\s+/g, " ").trim();
+        const apellido = (post.ApellInfPer || "sinApellido1").replace(/\s+/g, " ").trim();
+        const apellido2 = (post.ApellMatInfPer || "sinApellido2").replace(/\s+/g, " ").trim();
+        const cedula = post.CIInfPer || "sinCedula";
+        const fileName = `${nombre}_${apellido}_${apellido2}_${cedula}.jpg`;
+
+        // Add to ZIP
+        folder.file(fileName, byteArray, { binary: true });
+      } catch (processingError) {
+        console.warn(`No se pudo procesar la foto para CI: ${post.CIInfPer}`);
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Generate and Download ZIP">
+    Generate the ZIP file with maximum compression:
+
+    ```javascript
+    const content = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: {
+        level: 9,
+      },
+    });
+    
+    saveAs(content, "Estudiantes_con_Foto_por_Carrera.zip");
+    alert("Descarga completada con éxito!");
+    ```
+  </Step>
+</Steps>
+
+### Full Implementation
+
+```javascript
+async descargarDatosMasiva() {
+  this.cargando = true;
+  try {
+    const zip = new JSZip();
+
+    console.log("⏱️ Iniciando la obtención masiva de metadatos y fotos...");
+
+    const response = await API.get(`${this.baseUrl}/descargarfotosmasiva`, {
+      timeout: 600000, // 10 minutes
+    });
+
+    const registros = response.data?.data || [];
+    const totalRegistros = registros.length;
+
+    if (totalRegistros === 0) {
+      alert("No se encontraron estudiantes con foto para descargar.");
+      return;
+    }
+
+    console.log(`✅ Datos recibidos. Procesando ${totalRegistros} registros.`);
+
+    let contadorProcesado = 0;
+
+    for (const post of registros) {
+      try {
+        const byteCharacters = atob(post.fotografia);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+
+        const carreraNombre = post.NombCarr
+          ? post.NombCarr.replace(/[\\/:*?"<>|]/g, "_").trim()
+          : "Sin_Carrera";
+        const folder = zip.folder(carreraNombre);
+
+        const nombre = (post.NombInfPer || "sinNombre").replace(/\s+/g, " ").trim();
+        const apellido = (post.ApellInfPer || "sinApellido1").replace(/\s+/g, " ").trim();
+        const apellido2 = (post.ApellMatInfPer || "sinApellido2").replace(/\s+/g, " ").trim();
+        const cedula = post.CIInfPer || "sinCedula";
+        const fileName = `${nombre}_${apellido}_${apellido2}_${cedula}.jpg`;
+
+        folder.file(fileName, byteArray, { binary: true });
+      } catch (processingError) {
+        console.warn(`No se pudo procesar la foto para CI: ${post.CIInfPer}`);
+      }
+
+      contadorProcesado++;
+      const progreso = ((contadorProcesado / totalRegistros) * 100).toFixed(2);
+      console.log(`⏳ Procesado: ${contadorProcesado} / ${totalRegistros} (${progreso}%)`);
+    }
+
+    console.log("💾 Generando archivo ZIP final...");
+
+    const content = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 9 },
+    });
+    
+    saveAs(content, "Estudiantes_con_Foto_por_Carrera.zip");
+    alert("Descarga completada con éxito!");
+  } catch (error) {
+    console.error("❌ Error al generar ZIP:", error.response?.status, error);
+    
+    if (error.response?.status === 429) {
+      alert("El servidor reportó 'Too Many Requests' (429). Inténtelo de nuevo.");
+    } else if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+      alert("La conexión expiró. El proceso es muy pesado. Inténtelo de nuevo.");
+    } else {
+      alert("Ocurrió un error general al descargar los datos.");
+    }
+  } finally {
+    this.cargando = false;
+  }
+}
+```
+
+## Error Handling
+
+### Rate Limiting (HTTP 429)
+
+To avoid "Too Many Requests" errors:
+
+<Warning>
+  - Process records **sequentially** (not in parallel)
+  - Add a 300ms delay between each request
+  - Use a single bulk API endpoint instead of individual requests
+</Warning>
+
+### Timeout Errors
+
+```javascript
+timeout: 600000, // 10 minutes for bulk operations
+```
+
+Increase timeout for large datasets.
+
+### Photo Compatibility
+
+Some photos may not be compatible with HikCentral:
+
+```javascript
+if (res.data.code === "128") {
+  console.warn(`La foto de: ${p.CIInfPer} no es compatible con HikCentral.`);
+}
+```
+
+## Dependencies
+
+Make sure these libraries are installed:
+
+```bash
+npm install jszip file-saver lodash.debounce
+```
+
+```javascript
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import debounce from 'lodash.debounce';
+```
+
+<Tip>
+  Monitor the browser console for detailed progress logs during bulk operations.
+</Tip>

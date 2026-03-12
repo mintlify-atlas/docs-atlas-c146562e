@@ -1,0 +1,249 @@
+---
+title: Vuex Store
+description: Centralized state management for authentication and user data
+---
+
+## Overview
+
+The Biométrico application uses Vuex for centralized state management. The store primarily handles user authentication state and persists data to localStorage for session persistence.
+
+**Source**: `src/store/index.js`
+
+## State
+
+The store maintains the following state properties:
+
+<ParamField path="role" type="string | null">
+  User's role in the system. Retrieved from localStorage key `Rol_bio`. Valid roles include:
+  - `sotics`: SOTICS staff
+  - `atics`: ATICS staff  
+  - `sa`: System administrator
+</ParamField>
+
+<ParamField path="email" type="string | null">
+  User's email address. Retrieved from localStorage key `email_bio`.
+</ParamField>
+
+<ParamField path="idusu" type="string | null">
+  User's ID. Retrieved from localStorage key `id_bio`.
+</ParamField>
+
+<ParamField path="name" type="string | null">
+  User's full name. Retrieved from localStorage key `name_bio`.
+</ParamField>
+
+<ParamField path="token" type="string | null">
+  JWT authentication token. Retrieved from localStorage key `token_bio`.
+</ParamField>
+
+<ParamField path="token_type" type="string | null">
+  Token type (typically "Bearer"). Retrieved from localStorage key `token_type_bio`.
+</ParamField>
+
+## Getters
+
+The store provides the following getters for accessing computed state:
+
+### getIdusu
+
+Returns the current user's ID.
+
+```javascript
+getIdusu: state => state.idusu
+```
+
+**Usage**:
+```javascript
+const userId = this.$store.getters.getIdusu;
+```
+
+### isAuthenticated
+
+Returns `true` if a user is authenticated (has a valid token), `false` otherwise.
+
+```javascript
+isAuthenticated: state => !!state.token
+```
+
+**Usage**:
+```javascript
+if (this.$store.getters.isAuthenticated) {
+  // User is logged in
+}
+```
+
+### getFullToken
+
+Returns the complete authorization token string in the format `{token_type} {token}`.
+
+```javascript
+getFullToken: state => `${state.token_type} ${state.token}`
+```
+
+**Returns**: String like "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+**Usage**:
+```javascript
+const authHeader = this.$store.getters.getFullToken;
+```
+
+## Mutations
+
+Mutations are synchronous functions that modify the store state. All mutations also persist data to localStorage.
+
+### setRol_bio
+
+Sets the user's role in both state and localStorage.
+
+```javascript
+setRol_bio(state, nuevoRol)
+```
+
+<ParamField path="nuevoRol" type="string">
+  The new role to set (e.g., "sotics", "atics", "sa")
+</ParamField>
+
+**Usage**:
+```javascript
+this.$store.commit('setRol_bio', 'sotics');
+```
+
+### setemail_bio
+
+Sets the user's email in both state and localStorage.
+
+```javascript
+setemail_bio(state, nuevoemail)
+```
+
+<ParamField path="nuevoemail" type="string">
+  The email address to set
+</ParamField>
+
+### setid_bio
+
+Sets the user's ID in both state and localStorage.
+
+```javascript
+setid_bio(state, nuevoid)
+```
+
+<ParamField path="nuevoid" type="string">
+  The user ID to set
+</ParamField>
+
+### setname_bio
+
+Sets the user's name in both state and localStorage.
+
+```javascript
+setname_bio(state, nuevoname)
+```
+
+<ParamField path="nuevoname" type="string">
+  The user's full name
+</ParamField>
+
+### setToken_bio
+
+Sets the JWT authentication token in both state and localStorage.
+
+```javascript
+setToken_bio(state, token)
+```
+
+<ParamField path="token" type="string">
+  The JWT token received from authentication
+</ParamField>
+
+**Usage**:
+```javascript
+this.$store.commit('setToken_bio', response.data.token);
+```
+
+### setTokenType_bio
+
+Sets the token type in both state and localStorage.
+
+```javascript
+setTokenType_bio(state, type)
+```
+
+<ParamField path="type" type="string">
+  The token type (typically "Bearer")
+</ParamField>
+
+### logout_bio
+
+Clears all user data from both state and localStorage. This mutation handles complete session cleanup.
+
+```javascript
+logout_bio(state)
+```
+
+**Implementation**:
+```javascript
+logout_bio(state) {
+  // Limpia el state y localStorage al cerrar sesión
+  state.role = null;
+  state.email = null;
+  state.idusu = null;
+  state.name = null;
+  state.token = null;
+  state.token_type = null;
+
+  localStorage.removeItem('Rol_bio');
+  localStorage.removeItem('email_bio');
+  localStorage.removeItem('id_bio');
+  localStorage.removeItem('name_bio');
+  localStorage.removeItem('token_bio');
+  localStorage.removeItem('token_type_bio');
+  localStorage.removeItem('user_bio');
+}
+```
+
+**Usage**:
+```javascript
+this.$store.commit('logout_bio');
+this.$router.push('/');
+```
+
+## Complete Example
+
+Here's a complete example of using the store in a login component:
+
+```javascript
+import store from '@/store';
+
+// After successful login
+if (response.data.token) {
+  store.commit('setRol_bio', response.data.Role);
+  store.commit('setemail_bio', response.data.email);
+  store.commit('setname_bio', response.data.name);
+  store.commit('setToken_bio', response.data.token);
+  store.commit('setTokenType_bio', response.data.token_type || 'Bearer');
+  
+  // Navigate to home page
+  this.$router.push('/home');
+}
+
+// Check authentication status
+if (this.$store.getters.isAuthenticated) {
+  console.log('User is logged in');
+  console.log('User ID:', this.$store.getters.getIdusu);
+}
+
+// Logout
+this.$store.commit('logout_bio');
+```
+
+## Actions and Modules
+
+The current store implementation does not use actions or modules:
+
+```javascript
+actions: {},
+modules: {}
+```
+
+All state modifications are performed directly through mutations. Future enhancements could introduce actions for asynchronous operations.

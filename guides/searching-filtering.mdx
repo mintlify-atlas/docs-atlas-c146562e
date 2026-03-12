@@ -1,0 +1,345 @@
+---
+title: 'Search and Filter'
+description: 'Search students by CI or name, and filter results by career or department'
+---
+
+## Overview
+
+The Biométrico system provides powerful search and filtering capabilities to quickly find specific students or staff members in large datasets.
+
+## Search by CI or Name
+
+### Real-Time Search Input
+
+The search input field supports searching by:
+
+- **Cédula de Identidad (CI)** - National ID number
+- **Full Name** - First name, last name, or maternal surname
+
+```vue
+<input 
+  type="text" 
+  placeholder="Ingresa la cédula o nombre a buscar..." 
+  v-model="searchQuery"
+  @input="debouncedFilter"
+  class="h-11 w-full rounded-lg border" 
+/>
+```
+
+### Debounced Search
+
+To prevent excessive API calls while the user is typing, the search uses a **900ms debounce delay**:
+
+```javascript
+import debounce from 'lodash.debounce';
+
+export default {
+  data() {
+    return {
+      searchQuery: "",
+      debouncedFilter: null,
+    };
+  },
+  created() {
+    // Initialize debounced function
+    this.debouncedFilter = debounce(() => {
+      this.filterAndFetch();
+    }, 900);
+  },
+  methods: {
+    filterAndFetch() {
+      // Reset to page 1 when applying new filters
+      this.currentPage = 1;
+      this.getAdministrativosD(this.currentPage, this.searchQuery, this.selectedCarrera);
+    }
+  }
+}
+```
+
+<Note>
+  The 900ms delay means the API request only fires **after** the user stops typing for 900 milliseconds.
+</Note>
+
+## Filter by Career
+
+### Career Dropdown
+
+Filter results by academic career or department:
+
+```vue
+<select v-model="selectedCarrera" @change="debouncedFilter"
+  class="h-11 w-full rounded-lg border">
+  <option value="Todos">Todas las Carreras</option>
+  <option v-for="carrera in carrerasList" :key="carrera.id" :value="carrera.id">
+    {{ carrera.nombre }}
+  </option>
+</select>
+```
+
+### Load Career List
+
+The list of careers is loaded from the backend when the component mounts:
+
+```javascript
+async loadCarrerasList() {
+  try {
+    const response = await API.get(`${this.baseUrl}/carrerasList`);
+    this.carrerasList = response.data?.data || [];
+  } catch (error) {
+    console.error("❌ Error al obtener carreras:", error);
+    this.carrerasList = [];
+  }
+}
+```
+
+Call this method in the `mounted()` lifecycle hook:
+
+```javascript
+async mounted() {
+  this.getAdministrativosD(1, this.searchQuery, this.selectedCarrera);
+  this.loadCarrerasList();
+}
+```
+
+## Combined Search and Filter
+
+### Data Flow
+
+<Steps>
+  <Step title="User Input">
+    The user types in the search box or selects a career from the dropdown.
+  </Step>
+
+  <Step title="Debounced Trigger">
+    After 900ms of inactivity, `debouncedFilter()` is called, which triggers `filterAndFetch()`.
+  </Step>
+
+  <Step title="Reset to Page 1">
+    When filters change, the system resets to the first page:
+
+    ```javascript
+    filterAndFetch() {
+      this.currentPage = 1;
+      this.getAdministrativosD(this.currentPage, this.searchQuery, this.selectedCarrera);
+    }
+    ```
+  </Step>
+
+  <Step title="API Request with Parameters">
+    The search query and career filter are sent to the backend:
+
+    ```javascript
+    async getAdministrativosD(page = 1, searchQuery = "", carreraName = "Todos") {
+      this.cargando = true;
+      
+      const params = {
+        page: page,
+        search_query: searchQuery,
+        carrera_name: carreraName === 'Todos' ? '' : carreraName,
+      };
+
+      const response = await API.get(`${this.baseUrl}/estudiantesfoto`, { params });
+      
+      this.filteredpostulaciones = response.data?.data || [];
+      this.currentPage = response.data?.pagination.current_page || 1;
+      this.lastPage = response.data?.pagination.last_page || 1;
+      this.totalEstudiantes = response.data.pagination.total;
+      
+      this.cargando = false;
+    }
+    ```
+  </Step>
+
+  <Step title="Display Filtered Results">
+    The table is updated with the filtered data, and pagination controls are adjusted.
+  </Step>
+</Steps>
+
+## Search and Filter UI
+
+### Complete Example
+
+```vue
+<template>
+  <div class="flex flex-col gap-4 md:flex-row md:items-center mb-6">
+    <!-- Search Form -->
+    <form class="flex-grow">
+      <div class="relative">
+        <button class="absolute left-4 top-1/2 -translate-y-1/2">
+          <svg class="fill-gray-500" width="20" height="20"><!-- Search icon --></svg>
+        </button>
+        <input 
+          type="text" 
+          placeholder="Ingresa la cédula o nombre a buscar..." 
+          v-model="searchQuery"
+          @input="debouncedFilter"
+          class="h-11 w-full rounded-lg border pl-12 pr-14"
+        />
+      </div>
+    </form>
+    
+    <!-- Total Count -->
+    <div>
+      <label>Total de estudiantes matriculados y con foto: {{ totalEstudiantes }}</label>
+    </div>
+
+    <!-- Career Filter -->
+    <div class="relative w-full md:w-auto md:min-w-[280px]">
+      <select v-model="selectedCarrera" @change="debouncedFilter"
+        class="h-11 w-full rounded-lg border">
+        <option value="Todos">Todas las Carreras</option>
+        <option v-for="carrera in carrerasList" :key="carrera.id" :value="carrera.id">
+          {{ carrera.nombre }}
+        </option>
+      </select>
+      
+      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+## Backend API Expectations
+
+The backend endpoint should accept these query parameters:
+
+```javascript
+GET /biometrico/estudiantesfoto?page=1&search_query=Juan&carrera_name=Ingeniería
+```
+
+### Response Format
+
+```json
+{
+  "data": [
+    {
+      "CIInfPer": "1234567",
+      "NombInfPer": "Juan",
+      "ApellInfPer": "Pérez",
+      "ApellMatInfPer": "García",
+      "NombCarr": "Ingeniería de Sistemas",
+      "mailInst": "juan.perez@universidad.edu",
+      "hasPhoto": true
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 5,
+    "total": 123
+  }
+}
+```
+
+## Filter for Staff (Docentes)
+
+For staff members, you can filter by **personnel type** instead of career:
+
+```vue
+<select v-model="selectedtipodoc" @change="debouncedFilter">
+  <option v-for="item in tipodocList" :key="item.value" :value="item.value">
+    {{ item.label }}
+  </option>
+</select>
+```
+
+```javascript
+data() {
+  return {
+    selectedtipodoc: 'Todos',
+    tipodocList: [
+      { value: 'Todos', label: 'Todo el Personal' },
+      { value: 'Docente', label: 'Docentes' },
+      { value: 'Administrativo', label: 'Administrativos' },
+      { value: 'Servicios', label: 'Servicios' }
+    ],
+  };
+}
+```
+
+## Clear Filters
+
+To reset all filters:
+
+```javascript
+clearFilters() {
+  this.searchQuery = "";
+  this.selectedCarrera = "Todos";
+  this.filterAndFetch();
+}
+```
+
+```vue
+<button @click="clearFilters" class="btn btn-secondary">
+  Limpiar Filtros
+</button>
+```
+
+## Performance Considerations
+
+<Warning>
+  **Do not** send an API request on every keystroke. Use debouncing to reduce server load:
+  
+  ```javascript
+  // ❌ Bad: Fires on every keystroke
+  @input="filterAndFetch()"
+  
+  // ✅ Good: Waits 900ms after typing stops
+  @input="debouncedFilter"
+  ```
+</Warning>
+
+## Advanced: Multiple Filters
+
+You can combine multiple filters:
+
+```javascript
+filterAndFetch() {
+  this.currentPage = 1;
+  this.getAdministrativosD(
+    this.currentPage, 
+    this.searchQuery, 
+    this.selectedCarrera,
+    this.selectedStatus // Additional filter
+  );
+}
+```
+
+## State Management
+
+### Data Properties
+
+```javascript
+data() {
+  return {
+    searchQuery: "",
+    selectedCarrera: 'Todos',
+    carrerasList: [],
+    filteredpostulaciones: [],
+    totalEstudiantes: 0,
+    currentPage: 1,
+    lastPage: 1,
+    cargando: false,
+    debouncedFilter: null,
+  };
+}
+```
+
+### Loading State
+
+Display a loading indicator while fetching data:
+
+```vue
+<tr v-if="cargando">
+  <td colspan="9" class="text-center">
+    <h3>Cargando....</h3>
+  </td>
+</tr>
+```
+
+<Tip>
+  Store the user's last search and filter selections in `localStorage` to persist them across page reloads.
+</Tip>

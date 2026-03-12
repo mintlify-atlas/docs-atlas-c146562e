@@ -1,0 +1,257 @@
+---
+title: Breadcrumb
+description: Page breadcrumb navigation component with title display
+---
+
+## Overview
+
+The `PageBreadcrumb` component displays a breadcrumb navigation trail and page title, helping users understand their location in the application hierarchy.
+
+## Component Location
+
+```
+src/components/common/PageBreadcrumb.vue
+```
+
+## Features
+
+- Page title display
+- Home link navigation
+- Responsive design
+- Dark mode support
+- Router integration
+
+## Usage
+
+```vue
+<template>
+  <PageBreadcrumb pageTitle="Dashboard" />
+</template>
+
+<script setup>
+import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
+</script>
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `pageTitle` | `String` | Yes | The current page title to display |
+
+### Prop Definition
+
+```javascript
+defineProps({
+  pageTitle: {
+    type: String,
+    required: true
+  }
+});
+```
+
+## Template
+
+```vue
+<template>
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
+      {{ pageTitle }}
+    </h2>
+    <nav>
+      <ol class="flex items-center gap-1.5">
+        <li>
+          <router-link
+            class="inline-flex items-center gap-1.5 text-sm 
+                   text-gray-500 dark:text-gray-400"
+            to="/home"
+          >
+            Home
+            <svg
+              class="stroke-current"
+              width="17"
+              height="16"
+              viewBox="0 0 17 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M6.0765 12.667L10.2432 8.50033L6.0765 4.33366"
+                stroke=""
+                stroke-width="1.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </router-link>
+        </li>
+        <li class="text-sm text-gray-800 dark:text-white/90">
+          {{ pageTitle }}
+        </li>
+      </ol>
+    </nav>
+  </div>
+</template>
+```
+
+## Examples
+
+<Tabs>
+  <Tab title="Basic Usage">
+    ```vue
+    <template>
+      <div>
+        <PageBreadcrumb pageTitle="User Settings" />
+        <!-- Page content -->
+      </div>
+    </template>
+    ```
+  </Tab>
+  
+  <Tab title="With Dynamic Title">
+    ```vue
+    <template>
+      <PageBreadcrumb :pageTitle="currentPageTitle" />
+    </template>
+
+    <script setup>
+    import { computed } from 'vue'
+    import { useRoute } from 'vue-router'
+
+    const route = useRoute()
+    const currentPageTitle = computed(() => route.meta.title || 'Page')
+    </script>
+    ```
+  </Tab>
+  
+  <Tab title="Multiple Pages">
+    ```vue
+    <template>
+      <PageBreadcrumb pageTitle="Estudiantes" />
+    </template>
+
+    <!-- Another page -->
+    <template>
+      <PageBreadcrumb pageTitle="Docentes" />
+    </template>
+
+    <!-- Another page -->
+    <template>
+      <PageBreadcrumb pageTitle="Registro Individual" />
+    </template>
+    ```
+  </Tab>
+</Tabs>
+
+## Layout Structure
+
+```css
+.flex               /* Flexbox container */
+.flex-wrap          /* Allow wrapping on small screens */
+.items-center       /* Vertical centering */
+.justify-between    /* Space between title and breadcrumb */
+.gap-3              /* Gap between elements */
+.mb-6               /* Bottom margin */
+```
+
+## Styling
+
+### Page Title
+
+```css
+.text-xl                  /* Font size */
+.font-semibold            /* Font weight */
+.text-gray-800            /* Light mode color */
+.dark:text-white/90       /* Dark mode color */
+```
+
+### Breadcrumb Links
+
+```css
+.text-sm                  /* Small text */
+.text-gray-500            /* Light mode color */
+.dark:text-gray-400       /* Dark mode color */
+```
+
+### Chevron Icon
+
+```css
+.stroke-current           /* Inherits text color */
+```
+
+## Router Integration
+
+The component uses Vue Router's `<router-link>` for navigation:
+
+```vue
+<router-link to="/home">
+  Home
+</router-link>
+```
+
+## Responsive Behavior
+
+### Desktop
+- Title and breadcrumb side-by-side
+- Full spacing maintained
+
+### Mobile
+- Elements stack vertically via `flex-wrap`
+- Maintains readability on small screens
+
+## Accessibility
+
+The component uses semantic HTML:
+
+```html
+<nav>          <!-- Navigation landmark -->
+  <ol>         <!-- Ordered list for hierarchy -->
+    <li>       <!-- List items -->
+```
+
+Enhance with ARIA:
+
+```vue
+<nav aria-label="Breadcrumb">
+  <ol>
+    <li><a href="/home" aria-label="Home">Home</a></li>
+    <li aria-current="page">{{ pageTitle }}</li>
+  </ol>
+</nav>
+```
+
+## Customization
+
+### Add More Breadcrumb Levels
+
+```vue
+<ol class="flex items-center gap-1.5">
+  <li>
+    <router-link to="/">Home</router-link>
+    <ChevronIcon />
+  </li>
+  <li>
+    <router-link to="/section">Section</router-link>
+    <ChevronIcon />
+  </li>
+  <li aria-current="page">{{ pageTitle }}</li>
+</ol>
+```
+
+### Custom Separator
+
+```vue
+<!-- Use slash instead of chevron -->
+<span class="mx-2 text-gray-400">/</span>
+```
+
+### Colored Breadcrumb
+
+```vue
+<router-link 
+  class="text-brand-500 hover:text-brand-600"
+  to="/home"
+>
+  Home
+</router-link>
+```

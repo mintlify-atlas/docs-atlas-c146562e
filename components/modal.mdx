@@ -1,0 +1,257 @@
+---
+title: Modal
+description: Reusable modal component with backdrop and slot support
+---
+
+## Overview
+
+The `Modal` component provides a simple, reusable modal dialog with backdrop overlay and customizable content via slots.
+
+## Component Location
+
+```
+src/components/Modal/Modal.vue
+```
+
+## Features
+
+- Centered modal positioning
+- Backdrop overlay with blur effect
+- Click-outside-to-close functionality
+- Slot-based content
+- High z-index for layering
+- Scrollable content support
+
+## Usage
+
+<Tabs>
+  <Tab title="Basic Usage">
+    ```vue
+    <template>
+      <Modal v-if="isModalOpen" @close="isModalOpen = false">
+        <template #body>
+          <div class="modal-content">
+            <h2>Modal Title</h2>
+            <p>Modal content goes here</p>
+          </div>
+        </template>
+      </Modal>
+    </template>
+
+    <script setup>
+    import { ref } from 'vue'
+    import Modal from '@/components/Modal/Modal.vue'
+
+    const isModalOpen = ref(false)
+    </script>
+    ```
+  </Tab>
+  
+  <Tab title="With Form">
+    ```vue
+    <Modal v-if="isFormModalOpen" @close="isFormModalOpen = false">
+      <template #body>
+        <div class="modal-form">
+          <h2>Edit User</h2>
+          <form @submit.prevent="handleSubmit">
+            <input v-model="formData.name" placeholder="Name" />
+            <input v-model="formData.email" placeholder="Email" />
+            <button type="submit">Save</button>
+          </form>
+        </div>
+      </template>
+    </Modal>
+    ```
+  </Tab>
+  
+  <Tab title="Confirmation Dialog">
+    ```vue
+    <Modal v-if="isConfirmOpen" @close="isConfirmOpen = false">
+      <template #body>
+        <div class="confirmation-dialog">
+          <h3>Confirm Action</h3>
+          <p>Are you sure you want to proceed?</p>
+          <div class="actions">
+            <button @click="isConfirmOpen = false">Cancel</button>
+            <button @click="confirmAction">Confirm</button>
+          </div>
+        </div>
+      </template>
+    </Modal>
+    ```
+  </Tab>
+</Tabs>
+
+## Template
+
+```vue
+<template>
+  <div class="fixed inset-0 flex items-center justify-center 
+              overflow-y-auto modal z-99999">
+    <div
+      class="fixed inset-0 h-full w-full 
+             bg-gray-400/50 backdrop-blur-[32px]"
+      aria-hidden="true"
+      @click="$emit('close')"
+    ></div>
+    <slot name="body"></slot>
+  </div>
+</template>
+```
+
+## Events
+
+### @close
+
+Emitted when the backdrop is clicked:
+
+```vue
+<Modal @close="handleClose">
+  <!-- content -->
+</Modal>
+```
+
+```javascript
+const handleClose = () => {
+  // Clean up or save state
+  isModalOpen.value = false
+}
+```
+
+## Slots
+
+### body
+
+The main content slot for modal body:
+
+```vue
+<Modal>
+  <template #body>
+    <!-- Your modal content here -->
+  </template>
+</Modal>
+```
+
+## Styling
+
+### Modal Container
+
+```css
+.fixed inset-0          /* Full viewport coverage */
+.flex items-center     /* Center content vertically */
+.justify-center        /* Center content horizontally */
+.overflow-y-auto       /* Allow scrolling */
+.z-99999               /* High z-index */
+```
+
+### Backdrop
+
+```css
+.fixed inset-0                    /* Full viewport */
+.bg-gray-400/50                   /* Semi-transparent gray */
+.backdrop-blur-[32px]             /* Blur effect */
+```
+
+## Example: Full Modal Implementation
+
+```vue
+<template>
+  <button @click="openModal">Open Modal</button>
+  
+  <Modal v-if="isOpen" @close="closeModal">
+    <template #body>
+      <div class="relative w-full max-w-[700px] max-h-[90vh] 
+                  flex flex-col overflow-hidden rounded-3xl 
+                  bg-white dark:bg-gray-900 shadow-2xl">
+        
+        <!-- Close Button -->
+        <button 
+          @click="closeModal"
+          class="absolute right-5 top-5 z-999 flex h-11 w-11 
+                 items-center justify-center rounded-full 
+                 bg-gray-100 hover:bg-gray-200">
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <path d="M6.04 16.54L12 10.58l5.96 5.96 1.42-1.42L13.42 9l5.96-5.96-1.42-1.42L12 7.58 6.04 1.62 4.62 3.04 10.58 9l-5.96 5.96z"/>
+          </svg>
+        </button>
+        
+        <!-- Header -->
+        <div class="px-6 pt-8 lg:px-11 lg:pt-11">
+          <h4 class="mb-2 text-2xl font-semibold">Modal Title</h4>
+          <p class="mb-4 text-sm text-gray-500">Modal description</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="px-6 pb-4 overflow-y-auto lg:px-11">
+          <p>Your modal content here...</p>
+        </div>
+        
+        <!-- Footer -->
+        <div class="flex items-center gap-3 border-t p-6">
+          <button @click="closeModal">Cancel</button>
+          <button @click="save">Save</button>
+        </div>
+      </div>
+    </template>
+  </Modal>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import Modal from '@/components/Modal/Modal.vue'
+
+const isOpen = ref(false)
+
+const openModal = () => {
+  isOpen.value = true
+}
+
+const closeModal = () => {
+  isOpen.value = false
+}
+
+const save = () => {
+  // Save logic
+  closeModal()
+}
+</script>
+```
+
+## Accessibility
+
+For better accessibility, consider adding:
+
+```vue
+<div 
+  role="dialog" 
+  aria-modal="true" 
+  aria-labelledby="modal-title"
+  class="modal">
+  <!-- content -->
+</div>
+```
+
+## Prevent Body Scroll
+
+To prevent background scrolling when modal is open:
+
+```javascript
+import { watch } from 'vue'
+
+watch(isModalOpen, (isOpen) => {
+  if (isOpen) {
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = ''
+  }
+})
+```
+
+## Dark Mode Support
+
+The modal automatically adapts to dark mode:
+
+```css
+.bg-white           /* Light mode background */
+.dark:bg-gray-900   /* Dark mode background */
+```

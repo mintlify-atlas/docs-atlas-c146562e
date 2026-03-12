@@ -1,0 +1,482 @@
+---
+title: Vue Router Configuration
+description: Client-side routing configuration for the Biométrico application
+---
+
+## Overview
+
+The Biométrico application uses Vue Router for client-side navigation. The router is configured with web history mode and defines routes for authentication, photo management, and individual registration.
+
+**Source**: `src/router/index.js`
+
+## Router Configuration
+
+The router is created using `createWebHistory` mode:
+
+```javascript
+import { createRouter, createWebHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createWebHistory(process.env.BASE_URL),
+  routes
+})
+```
+
+**Source**: `src/router/index.js:62-65`
+
+### Configuration Details
+
+<ParamField path="history" type="RouterHistory">
+  Uses HTML5 history mode with the base URL from `process.env.BASE_URL`. This provides clean URLs without hash fragments.
+</ParamField>
+
+<ParamField path="routes" type="RouteRecordRaw[]">
+  Array of route definitions (see below)
+</ParamField>
+
+## Route Definitions
+
+### Login Route
+
+The application entry point for authentication.
+
+```javascript
+{
+  path: '/',
+  name: 'login',
+  component: Login
+}
+```
+
+**Source**: `src/router/index.js:12-16`
+
+<ParamField path="path" type="string">
+  `/` - Root path of the application
+</ParamField>
+
+<ParamField path="name" type="string">
+  `login` - Route name for programmatic navigation
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `Login` - Component from `src/views/Login/Signin.vue`
+</ParamField>
+
+**Usage**:
+```javascript
+this.$router.push('/');
+// or
+this.$router.push({ name: 'login' });
+```
+
+### Home Route
+
+Main dashboard after authentication.
+
+```javascript
+{
+  path: '/home',
+  name: 'home',
+  component: HomeView
+}
+```
+
+**Source**: `src/router/index.js:17-21`
+
+<ParamField path="path" type="string">
+  `/home` - Home dashboard path
+</ParamField>
+
+<ParamField path="name" type="string">
+  `home` - Route name
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `HomeView` - Component from `src/views/HomeView.vue`
+</ParamField>
+
+**Usage**:
+```javascript
+this.$router.push('/home');
+// or
+this.$router.push({ name: 'home' });
+```
+
+### Pre-Students Photos Route
+
+Photo management for pre-students (applicants/pre-enrolled).
+
+```javascript
+{
+  path: '/estudiantes_pre_pictures',
+  name: 'Estudiantes Pre',
+  component: Estudiantes_Pre_FotoViews
+}
+```
+
+**Source**: `src/router/index.js:22-26`
+
+<ParamField path="path" type="string">
+  `/estudiantes_pre_pictures` - Pre-students photo management
+</ParamField>
+
+<ParamField path="name" type="string">
+  `Estudiantes Pre` - Route name
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `Estudiantes_Pre_FotoViews` - Component from `src/views/FotosViews/Estudiantes_Pre_FotoViews.vue`
+</ParamField>
+
+### Pre-Students Registration Route
+
+Individual registration for pre-students.
+
+```javascript
+{
+  path: '/estudiantes_pre_registro',
+  name: 'Estudiantes Pre R',
+  component: Registro_IndvPreEst
+}
+```
+
+**Source**: `src/router/index.js:27-31`
+
+<ParamField path="path" type="string">
+  `/estudiantes_pre_registro` - Pre-student individual registration
+</ParamField>
+
+<ParamField path="name" type="string">
+  `Estudiantes Pre R` - Route name
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `Registro_IndvPreEst` - Component from `src/views/FotosViews/Registro_IndvPreEst.vue`
+</ParamField>
+
+### Students Photos Route
+
+Photo management for regular enrolled students.
+
+```javascript
+{
+  path: '/estudiantes_pictures',
+  name: 'Estudiantes',
+  component: Estudiantes_FotoViews
+}
+```
+
+**Source**: `src/router/index.js:32-36`
+
+<ParamField path="path" type="string">
+  `/estudiantes_pictures` - Students photo management
+</ParamField>
+
+<ParamField path="name" type="string">
+  `Estudiantes` - Route name
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `Estudiantes_FotoViews` - Component from `src/views/FotosViews/Estudiantes_FotoViews.vue`
+</ParamField>
+
+### Teachers Photos Route
+
+Photo management for teachers/docentes.
+
+```javascript
+{
+  path: '/docentes_pictures',
+  name: 'Docentes',
+  component: Docentes_FotoViews
+}
+```
+
+**Source**: `src/router/index.js:37-41`
+
+<ParamField path="path" type="string">
+  `/docentes_pictures` - Teachers photo management
+</ParamField>
+
+<ParamField path="name" type="string">
+  `Docentes` - Route name
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `Docentes_FotoViews` - Component from `src/views/FotosViews/Docentes_FotoViews.vue`
+</ParamField>
+
+### Teachers Registration Route
+
+Individual registration for teachers.
+
+```javascript
+{
+  path: '/docentes_registro',
+  name: 'DocenteR',
+  component: Registro_IndvDoc
+}
+```
+
+**Source**: `src/router/index.js:42-46`
+
+<ParamField path="path" type="string">
+  `/docentes_registro` - Teacher individual registration
+</ParamField>
+
+<ParamField path="name" type="string">
+  `DocenteR` - Route name
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `Registro_IndvDoc` - Component from `src/views/FotosViews/Registro_IndvDoc.vue`
+</ParamField>
+
+### Students Registration Route
+
+Individual registration for students.
+
+```javascript
+{
+  path: '/estudiantes_registro',
+  name: 'EstudianteR',
+  component: Registro_IndvEst
+}
+```
+
+**Source**: `src/router/index.js:47-51`
+
+<ParamField path="path" type="string">
+  `/estudiantes_registro` - Student individual registration
+</ParamField>
+
+<ParamField path="name" type="string">
+  `EstudianteR` - Route name
+</ParamField>
+
+<ParamField path="component" type="Component">
+  `Registro_IndvEst` - Component from `src/views/FotosViews/Registro_IndvEst.vue`
+</ParamField>
+
+### About Route (Lazy Loaded)
+
+About page with code splitting.
+
+```javascript
+{
+  path: '/about',
+  name: 'about',
+  component: () => import(/* webpackChunkName: "about" */ '../views/AboutView.vue')
+}
+```
+
+**Source**: `src/router/index.js:52-59`
+
+<ParamField path="path" type="string">
+  `/about` - About page
+</ParamField>
+
+<ParamField path="name" type="string">
+  `about` - Route name
+</ParamField>
+
+<ParamField path="component" type="Function">
+  Lazy-loaded component using dynamic import. This creates a separate chunk (about.[hash].js) that is only loaded when the route is visited.
+</ParamField>
+
+## Navigation Methods
+
+### Programmatic Navigation
+
+#### Using Path
+
+```javascript
+// Navigate to home
+this.$router.push('/home');
+
+// Navigate to teachers photos
+this.$router.push('/docentes_pictures');
+
+// Navigate back to login
+this.$router.push('/');
+```
+
+#### Using Named Routes
+
+```javascript
+// Navigate to home
+this.$router.push({ name: 'home' });
+
+// Navigate to students photos
+this.$router.push({ name: 'Estudiantes' });
+
+// Navigate to login
+this.$router.push({ name: 'login' });
+```
+
+#### Using Router Link in Templates
+
+```vue
+<template>
+  <router-link to="/home">Go to Home</router-link>
+  <router-link :to="{ name: 'Docentes' }">Teachers</router-link>
+</template>
+```
+
+### Navigation Guards
+
+While not implemented in the current router configuration, you can add navigation guards:
+
+```javascript
+router.beforeEach((to, from, next) => {
+  // Check if user is authenticated
+  const isAuthenticated = store.getters.isAuthenticated;
+  
+  // Redirect to login if not authenticated and trying to access protected route
+  if (to.name !== 'login' && !isAuthenticated) {
+    next({ name: 'login' });
+  } else {
+    next();
+  }
+});
+```
+
+## Route Organization
+
+The routes are organized into three main categories:
+
+### Authentication
+- `/` - Login page
+
+### Photo Management
+- `/docentes_pictures` - Teachers photos
+- `/estudiantes_pictures` - Students photos
+- `/estudiantes_pre_pictures` - Pre-students photos
+
+### Individual Registration
+- `/docentes_registro` - Teacher registration
+- `/estudiantes_registro` - Student registration
+- `/estudiantes_pre_registro` - Pre-student registration
+
+### Other
+- `/home` - Dashboard
+- `/about` - About page (lazy loaded)
+
+## Best Practices
+
+### Use Named Routes
+
+Prefer named routes for better maintainability:
+
+```javascript
+// Good
+this.$router.push({ name: 'home' });
+
+// Acceptable
+this.$router.push('/home');
+```
+
+### Handle Navigation Errors
+
+```javascript
+try {
+  await this.$router.push({ name: 'home' });
+} catch (error) {
+  if (error.name !== 'NavigationDuplicated') {
+    console.error('Navigation error:', error);
+  }
+}
+```
+
+### Check Current Route
+
+```javascript
+// Get current route
+const currentRoute = this.$route;
+
+console.log('Current path:', currentRoute.path);
+console.log('Current name:', currentRoute.name);
+
+// Check if on specific route
+if (this.$route.name === 'home') {
+  console.log('User is on home page');
+}
+```
+
+### Access Route Parameters
+
+```javascript
+// Access route params
+const params = this.$route.params;
+
+// Access query parameters
+const query = this.$route.query;
+
+// Example: /user/123?tab=profile
+console.log(this.$route.params.id);    // '123'
+console.log(this.$route.query.tab);     // 'profile'
+```
+
+## History Mode
+
+The router uses HTML5 History mode (`createWebHistory`), which:
+
+- Provides clean URLs without hash (`#`) fragments
+- Requires server configuration to handle client-side routes
+- Falls back to hash mode if the browser doesn't support it
+
+### Server Configuration
+
+For production, configure your server to serve `index.html` for all routes:
+
+**Nginx example**:
+```nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+**Apache example** (`.htaccess`):
+```apache
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+```
+
+## Route Metadata
+
+Currently, routes don't have metadata, but you can add it:
+
+```javascript
+{
+  path: '/home',
+  name: 'home',
+  component: HomeView,
+  meta: {
+    requiresAuth: true,
+    roles: ['sotics', 'atics', 'sa'],
+    title: 'Dashboard'
+  }
+}
+```
+
+Then use it in navigation guards:
+
+```javascript
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresAuth) {
+    // Check authentication
+  }
+  
+  if (to.meta.title) {
+    document.title = to.meta.title;
+  }
+  
+  next();
+});
+```
