@@ -1,0 +1,129 @@
+{
+  "projectType": "saas",
+  "projectName": "Biométrico",
+  "projectDescription": "A biometric management system for registering and synchronizing student and teacher photos with HikCentral biometric devices",
+  "theme": "mint",
+  "primaryColor": "#4ebb86",
+  "lightColor": "#445564",
+  "darkColor": "#d0e6dd",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "installation"]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/student-registration",
+              "features/teacher-registration",
+              "features/photo-management",
+              "features/hikcentral-sync"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "guides/authentication",
+              "guides/managing-photos",
+              "guides/bulk-operations",
+              "guides/searching-filtering"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "integration/hikcentral",
+              "integration/api-configuration",
+              "integration/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Components",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["components/overview"]
+          },
+          {
+            "group": "Layout",
+            "pages": [
+              "components/admin-layout",
+              "components/header",
+              "components/sidebar"
+            ]
+          },
+          {
+            "group": "Registration",
+            "pages": [
+              "components/student-registration",
+              "components/teacher-registration",
+              "components/photo-upload"
+            ]
+          },
+          {
+            "group": "Common",
+            "pages": [
+              "components/modal",
+              "components/theme-toggler",
+              "components/breadcrumb"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["api/overview"]
+          },
+          {
+            "group": "State Management",
+            "pages": [
+              "api/vuex-store",
+              "api/authentication-state"
+            ]
+          },
+          {
+            "group": "Services",
+            "pages": [
+              "api/axios-configuration",
+              "api/api-endpoints"
+            ]
+          },
+          {
+            "group": "Router",
+            "pages": ["api/routing"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Student and teacher photo registration",
+    "HikCentral biometric system integration",
+    "Bulk photo synchronization",
+    "Photo comparison and verification",
+    "Search and filtering by career/program",
+    "Bulk download with ZIP export",
+    "Real-time registration status tracking",
+    "Authentication with token-based API"
+  ],
+  "publicApiSurface": [
+    "/biometrico/estudiantesfoto",
+    "/biometrico/fotografia/:ci",
+    "/biometrico/sync-hikdoc/:ci",
+    "/biometrico/getperson-est/:ci",
+    "/biometrico/compare-hikdoc-est/:ci",
+    "/biometrico/descargarfotosmasiva",
+    "/biometrico/get-pending-sync-est",
+    "/biometrico/carrerasList",
+    "/biometrico/gethick/:ci"
+  ]
+}
